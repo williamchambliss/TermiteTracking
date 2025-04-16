@@ -11,7 +11,8 @@ PORT = 5000
 # Start the subprocess that streams MJPEG from libcamera-vid through ffmpeg
 cmd = (
     "libcamera-vid -t 0 --inline --width 640 --height 480 --framerate 30 "
-    "--codec mjpeg -o - | ffmpeg -i - -f image2pipe -vcodec mjpeg -"
+    "--codec mjpeg -o - | "
+    "ffmpeg -fflags nobuffer -flush_packets 1 -i - -f image2pipe -vcodec mjpeg -"
 )
 print("Starting libcamera stream...")
 stream = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)

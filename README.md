@@ -29,5 +29,3 @@ This project aims to improve the efficiency and accuracy of termite behavioral s
 - **Preprocessing Pipeline:** Includes steps like cropping, adjusting FPS, and reducing noise.
 - **Transmission:** Compression and frame transmission to larger computer to run inference on proccessed frame.
 
-- libcamera-vid -t 0 --inline --width 640 --height 480 --framerate 30 --codec mjpeg -o - | ffmpeg -i - -f image2pipe -vcodec mjpeg - 2>/dev/null
-

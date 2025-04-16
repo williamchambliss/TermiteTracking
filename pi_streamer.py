@@ -5,7 +5,7 @@ import numpy as np
 import subprocess
 
 # Server (PC) IP & Port
-SERVER_IP = "192.168.1.100"  # Change this to the PC's IP
+SERVER_IP = "192.168.1.252"  # Change this to the PC's IP
 PORT = 5000
 BUFFER_SIZE = 4096
 

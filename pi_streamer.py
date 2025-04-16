@@ -13,9 +13,9 @@ cmd = [
     "libcamera-vid",
     "-t", "0",                      # no timeout (run forever)
     "--inline",                    # needed for MJPEG streaming
-    "--width", "640",
-    "--height", "480",
-    "--framerate", "30",
+    "--width", "2000",
+    "--height", "2000",
+    "--framerate", "5",
     "--codec", "mjpeg",
     "-o", "-"                      # output to stdout
 ]

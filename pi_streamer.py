@@ -1,45 +1,50 @@
-import cv2
 import socket
 import struct
+import subprocess
+import cv2
+import numpy as np
 
 # Server (PC) IP & Port
-SERVER_IP = "192.168.1.252"  # <-- Change this to your PC's IP address
+SERVER_IP = "192.168.1.252
 PORT = 5000
 
-# Open network socket
+# Start the subprocess that streams MJPEG from libcamera-vid through ffmpeg
+cmd = (
+    "libcamera-vid -t 0 --inline --width 640 --height 480 --framerate 30 "
+    "--codec mjpeg -o - | ffmpeg -i - -f image2pipe -vcodec mjpeg -"
+)
+print("Starting libcamera stream...")
+stream = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+# Connect to the PC
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect((SERVER_IP, PORT))
-
-# Open camera
-camera = cv2.VideoCapture(0)
-camera.set(cv2.CAP_PROP_FRAME_WIDTH, 4056)
-camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 3040)
+print("Connected to PC.")
 
 try:
     while True:
-        ret, frame = camera.read()
-        if not ret:
+        # Read a chunk of data (JPEG frames aren't fixed size, so we may need to buffer smartly)
+        data = stream.stdout.read(4096)
+
+        if not data:
+            print("No data received from libcamera stream.")
             break
 
-        # Crop to 2000x2000 pixels (center crop)
-        cropped_frame = frame[520:2520, 1028:3028]
+        # Wait until we have a complete JPEG frame (basic JPEG end marker detection)
+        while not data.endswith(b'\xff\xd9'):
+            more = stream.stdout.read(4096)
+            if not more:
+                break
+            data += more
 
-        # Encode to JPEG
-        ret, encoded_img = cv2.imencode(".jpg", cropped_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
-        if not ret:
-            continue
-
-        data = encoded_img.tobytes()
-
-        # Send frame size first
+        # Send frame size
         sock.sendall(struct.pack(">I", len(data)))
-
-        # Send the frame data
+        # Send frame data
         sock.sendall(data)
 
 except KeyboardInterrupt:
     print("Stopping capture...")
 
 finally:
-    camera.release()
+    stream.terminate()
     sock.close()

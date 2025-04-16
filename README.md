@@ -1,7 +1,6 @@
 # AI-Powered Termite Tracking System
 
 ## Overview
-A Pi Camera Module (ribbon cable into the CSI port)?
 
 
 The AI-Powered Termite Tracking System is designed to automate the process of monitoring termite behavior in a petri dish using real-time computer vision and machine learning. The system utilizes a high-resolution camera connected to a Raspberry Pi, which processes video input and sends the video to a larger computer which performs inference using a pre-trained deep learning model (e.g., SLEAP) to track individual termites and their components in near real time. The processed data is then transmitted and configured for further analysis and visualization.
@@ -29,3 +28,6 @@ This project aims to improve the efficiency and accuracy of termite behavioral s
 - **Automated Recording:** Develop a script to start recording once the petri dish is placed and a button is pressed.
 - **Preprocessing Pipeline:** Includes steps like cropping, adjusting FPS, and reducing noise.
 - **Transmission:** Compression and frame transmission to larger computer to run inference on proccessed frame.
+
+- libcamera-vid -t 0 --inline --width 640 --height 480 --framerate 30 --codec mjpeg -o - | ffmpeg -i - -f image2pipe -vcodec mjpeg - 2>/dev/null
+

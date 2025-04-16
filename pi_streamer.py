@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 
 # Server (PC) IP & Port
-SERVER_IP = "192.168.1.252
+SERVER_IP = "192.168.1.252"
 PORT = 5000
 
 # Start the subprocess that streams MJPEG from libcamera-vid through ffmpeg

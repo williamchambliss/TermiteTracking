@@ -1,13 +1,10 @@
 import cv2
 import socket
 import struct
-import numpy as np
-import subprocess
 
 # Server (PC) IP & Port
-SERVER_IP = "192.168.1.252"  # Change this to the PC's IP
+SERVER_IP = "192.168.1.252"  # <-- Change this to your PC's IP address
 PORT = 5000
-BUFFER_SIZE = 4096
 
 # Open network socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -15,17 +12,8 @@ sock.connect((SERVER_IP, PORT))
 
 # Open camera
 camera = cv2.VideoCapture(0)
-camera.set(cv2.CAP_PROP_FRAME_WIDTH, 4056)  # Max resolution for Pi AI Camera
+camera.set(cv2.CAP_PROP_FRAME_WIDTH, 4056)
 camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 3040)
-
-# FFmpeg H.264 encoding
-ENCODED_FORMAT = ".mp4"
-QUALITY = 23  # Lower is better quality (0–51)
-ffmpeg_command = f"ffmpeg -i pipe:0 -c:v libx264 -preset ultrafast -crf {QUALITY} -f mp4 pipe:1"
-
-ffmpeg_process = subprocess.Popen(
-    ffmpeg_command.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
-)
 
 try:
     while True:
@@ -36,17 +24,18 @@ try:
         # Crop to 2000x2000 pixels (center crop)
         cropped_frame = frame[520:2520, 1028:3028]
 
-        # Encode frame using FFmpeg
-        ffmpeg_process.stdin.write(cropped_frame.tobytes())
+        # Encode to JPEG
+        ret, encoded_img = cv2.imencode(".jpg", cropped_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+        if not ret:
+            continue
 
-        # Read FFmpeg's output
-        encoded_frame = ffmpeg_process.stdout.read(BUFFER_SIZE)
+        data = encoded_img.tobytes()
 
         # Send frame size first
-        sock.sendall(struct.pack(">I", len(encoded_frame)))
+        sock.sendall(struct.pack(">I", len(data)))
 
-        # Send the frame
-        sock.sendall(encoded_frame)
+        # Send the frame data
+        sock.sendall(data)
 
 except KeyboardInterrupt:
     print("Stopping capture...")
@@ -54,6 +43,3 @@ except KeyboardInterrupt:
 finally:
     camera.release()
     sock.close()
-    ffmpeg_process.stdin.close()
-    ffmpeg_process.stdout.close()
-    ffmpeg_process.wait()

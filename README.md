@@ -28,4 +28,19 @@ This project aims to improve the efficiency and accuracy of termite behavioral s
 - **Automated Recording:** Develop a script to start recording once the petri dish is placed and a button is pressed.
 - **Preprocessing Pipeline:** Includes steps like cropping, adjusting FPS, and reducing noise.
 - **Transmission:** Compression and frame transmission to larger computer to run inference on proccessed frame.
-
+Step	Next Steps
+Research hardware (Camera and pi) 	DONE
+Develop a plan on connection between pi and camera and computer	DONE
+Get the right hardware	DONE
+Connect the camera to the raspberry pi	DONE
+implement the transmit data from camera to pi, do any sort of proccessing and then to the computer	DONE
+Power/Wake button	1. Wire a momentary pushbutton between Pi RUN (pin 5/GPIO3) and GND (pin 6)
+“Start streamer” button	1. Wire a second button to GPIO17 (pin 11) → GND (pin 9) and Run Script
+PC GUI with video preview, Run button, and path fields and inference preview	
+Test with personal laptop entire process	
+develop correct case	
+find correct LED lights for case	
+3D print case	
+connect everything to case	
+Record a good amount of termites with this set up, train models based off of these 	
+I want to have some sort of button or switch, so when I flip it, Pi will turn on and turn on that file, I also want to have a gui, so when I start the file on my computer from the cmd line, it will pop up a gui that shows a preview, a run button, and real time inference if that is possible, and a textbox that I tell where to store the inference file, where to store the video file, and where the model to run the inference is.	

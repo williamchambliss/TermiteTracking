@@ -41,8 +41,7 @@ Test with personal laptop entire process
 develop correct case	
 find correct LED lights for case	
 3D print case
-
-Current: make sure sleap works
 connect everything to case	
 Record a good amount of termites with this set up, train models based off of these 	
 I want to have some sort of button or switch, so when I flip it, Pi will turn on and turn on that file, I also want to have a gui, so when I start the file on my computer from the cmd line, it will pop up a gui that shows a preview, a run button, and real time inference if that is possible, and a textbox that I tell where to store the inference file, where to store the video file, and where the model to run the inference is.	
+Current: make sure sleap works; sleap_env\Scripts\activate to activate venv; currently downloading cuda to then download sleap then to test all my code

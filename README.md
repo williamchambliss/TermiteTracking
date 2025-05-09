@@ -1,5 +1,6 @@
 # AI-Powered Termite Tracking System
-Current: redue everything for sleap to work nothing seems to work due to all of the versions of cuda, tensorflow, python, cdnn not to work; sleap_env\Scripts\activate to activate venv; currently downloading cuda to then download sleap then to test all my code
+Current: Reciever Gui is working and am about to test if the whole system works
+To activate sleap on my laptop: conda activate sleap THEN sleap-label THEN python reciever_gui 
 
 ## Overview
 

@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 
 # Server (PC) IP & Port
-SERVER_IP = "192.168.1.252"  # <-- your PC's IP
+SERVER_IP = "192.168.50.1"  # <-- your PC's IP
 PORT = 5000
 
 # Start libcamera-vid to output MJPEG directly
@@ -15,7 +15,7 @@ cmd = [
     "--inline",                    # needed for MJPEG streaming
     "--width", "2000",
     "--height", "2000",
-    "--framerate", "5",
+    "--framerate", "1",
     "--codec", "mjpeg",
     "-o", "-"                      # output to stdout
 ]

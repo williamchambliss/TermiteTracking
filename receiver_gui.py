@@ -5,32 +5,37 @@ import socket
 import struct
 import cv2
 import numpy as np
+import math
 import sleap
 from sleap.nn.inference import load_model
+from sleap import Video
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QPushButton,
     QLineEdit, QFileDialog, QVBoxLayout, QHBoxLayout
 )
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QImage, QPixmap
-import csv
+import json
 import os
 
 class ReceiverGUI(QWidget):
     def __init__(self):
         super().__init__()
         sleap.disable_preallocation()
+        self.lock = threading.Lock()
 
-        # — UI Elements —
-        self.modelPath = QLineEdit()
-        self.inferPath = QLineEdit()
-        self.videoPath = QLineEdit()
-        self.btnBrowseModel = QPushButton("Browse…")
-        self.btnBrowseInfer = QPushButton("Browse…")
-        self.btnBrowseVideo = QPushButton("Browse…")
-        self.btnRun  = QPushButton("Run")
-        self.btnStop = QPushButton("Stop")
-        self.preview = QLabel(alignment=Qt.AlignCenter)
+        # UI Elements
+        self.centroidPath  = QLineEdit()
+        self.posePath      = QLineEdit()
+        self.inferPath     = QLineEdit()
+        self.videoPath     = QLineEdit()
+        self.btnBrowseCentroid = QPushButton("Browse…")
+        self.btnBrowsePose     = QPushButton("Browse…")
+        self.btnBrowseInfer    = QPushButton("Browse…")
+        self.btnBrowseVideo    = QPushButton("Browse…")
+        self.btnRun       = QPushButton("Run")
+        self.btnStop      = QPushButton("Stop")
+        self.preview      = QLabel(alignment=Qt.AlignCenter)
 
         # Layout helper
         def makeRow(label, line, btn):
@@ -40,37 +45,38 @@ class ReceiverGUI(QWidget):
             h.addWidget(btn)
             return h
 
-        # — Layout —
+        # Layout setup
         layout = QVBoxLayout()
-        layout.addLayout(makeRow("Model:",      self.modelPath,  self.btnBrowseModel))
-        layout.addLayout(makeRow("Infer out:",  self.inferPath,  self.btnBrowseInfer))
-        layout.addLayout(makeRow("Video save:", self.videoPath,  self.btnBrowseVideo))
+        layout.addLayout(makeRow("Centroid model:", self.centroidPath, self.btnBrowseCentroid))
+        layout.addLayout(makeRow("Pose model:",     self.posePath,     self.btnBrowsePose))
+        layout.addLayout(makeRow("Infer out:",      self.inferPath,    self.btnBrowseInfer))
+        layout.addLayout(makeRow("Video save:",     self.videoPath,    self.btnBrowseVideo))
         layout.addWidget(self.preview)
         layout.addWidget(self.btnRun)
         layout.addWidget(self.btnStop)
         self.setLayout(layout)
 
-        # — Signals —
-        self.btnBrowseModel.clicked.connect(lambda: self._browse(self.modelPath))
+        # Signals
+        self.btnBrowseCentroid.clicked.connect(lambda: self._browse(self.centroidPath))
+        self.btnBrowsePose.clicked.connect(lambda: self._browse(self.posePath))
         self.btnBrowseInfer.clicked.connect(lambda: self._browse(self.inferPath))
         self.btnBrowseVideo.clicked.connect(lambda: self._browse(self.videoPath))
         self.btnRun.clicked.connect(self.start_receiving)
         self.btnStop.clicked.connect(self.stop_receiving)
 
-        # — State —
-        self.sock = None
-        self.thread = None
-        self.running = False
-        self.predictor = None
-        self.timer = QTimer()
+        # State
+        self.sock        = None
+        self.conn        = None
+        self.thread      = None
+        self.running     = False
+        self.predictor   = None
+        self.timer       = QTimer()
         self.timer.timeout.connect(self._update_preview)
-        # Video saving state
-        self.writer = None
-        self.video_fps = 5  # Match Pi stream rate
-        # Inference saving state
-        self.csv_file = None
-        self.csv_writer = None
-        self.frame_idx = 0
+        self.writer      = None
+        self.writer_path = None
+        self.video_fps   = 5
+        self.json_buffer = []
+        self.frame_idx   = 0
 
         self.setWindowTitle("SLEAP Receiver")
         self.resize(800, 600)
@@ -83,118 +89,176 @@ class ReceiverGUI(QWidget):
     def start_receiving(self):
         if self.running:
             return
-        # Reset frame counter
-        self.frame_idx = 0
-        # Load SLEAP model
-        model_dir = self.modelPath.text()
-        self.predictor = load_model(model_dir, batch_size=1)
+        self.frame_idx   = 0
+        self.json_buffer = []
 
-        # Open socket to Pi
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect(("192.168.1.252", 5000))
+        # Load top-down models
+        centroid_dir = self.centroidPath.text().strip()
+        pose_dir     = self.posePath.text().strip()
+        self.predictor = load_model([centroid_dir, pose_dir], batch_size=1)
 
-        # Prepare video writer if a save path was provided
-        vid_dir = self.videoPath.text().rstrip('/')
+        # Video writer path
+        vid_dir = self.videoPath.text().rstrip('/').strip()
         if vid_dir:
             os.makedirs(vid_dir, exist_ok=True)
-            fourcc = cv2.VideoWriter_fourcc(*'XVID')
-            out_path = f"{vid_dir}/output.avi"
-            # Assuming incoming frames are 2000x2000
-            self.writer = cv2.VideoWriter(out_path, fourcc, self.video_fps, (2000, 2000))
-            print(f"Saving video to: {out_path}")
+            self.writer_path = os.path.join(vid_dir, "output.avi")
+            print(f"Saving video to: {self.writer_path}")
 
-        # Prepare CSV writer if an inference path was provided
-        inf_dir = self.inferPath.text().rstrip('/')
+        # Inference JSON path
+        inf_dir = self.inferPath.text().rstrip('/').strip()
         if inf_dir:
             os.makedirs(inf_dir, exist_ok=True)
-            csv_path = f"{inf_dir}/inference.csv"
-            self.csv_file = open(csv_path, 'w', newline='')
-            self.csv_writer = csv.writer(self.csv_file)
-            self.csv_writer.writerow(['frame', 'instance', 'keypoint', 'x', 'y', 'score'])
-            print(f"Writing inference to: {csv_path}")
+            self.json_path = os.path.join(inf_dir, "inference.json")
+            print(f"Writing inference to: {self.json_path}")
 
-        # Start receiving thread and GUI updates
+        # Start thread and timer
         self.running = True
-        self.thread = threading.Thread(target=self._recv_loop, daemon=True)
+        self.thread  = threading.Thread(target=self._recv_loop, daemon=True)
         self.thread.start()
-        self.timer.start(30)  # ~30 Hz GUI refresh
-        print("Started receiving and inference.")
+        self.timer.start(30)
 
     def stop_receiving(self):
-        # Stop threads and close socket
         self.running = False
         self.timer.stop()
+
+        if self.conn:
+            self.conn.close(); self.conn = None
         if self.sock:
-            self.sock.close()
-            self.sock = None
-        # Release video writer
+            self.sock.close(); self.sock = None
         if self.writer:
-            self.writer.release()
-            self.writer = None
-            print("Video saved and writer released.")
-        # Close CSV file
-        if self.csv_file:
-            self.csv_file.close()
-            self.csv_file = None
-            print("Inference CSV saved and closed.")
+            self.writer.release(); print("Video saved.")
+
+        if hasattr(self, 'json_path'):
+            with open(self.json_path, 'w') as f:
+                json.dump(self.json_buffer, f, indent=2)
+            print("Inference JSON saved.")
+
         print("Stopped receiving.")
 
     def _recv_loop(self):
-        buf = b""
-        while self.running:
-            # Read 4-byte frame size header
-            while len(buf) < 4:
-                data = self.sock.recv(1024)
-                if not data:
-                    return
-                buf += data
-            size = struct.unpack(">I", buf[:4])[0]
-            buf = buf[4:]
+        try:
+            # Server setup
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.sock.bind(("0.0.0.0", 5000))
+            self.sock.listen(1)
+            print("Server listening on port 5000")
 
-            # Read full JPEG frame
-            while len(buf) < size:
-                data = self.sock.recv(size - len(buf))
-                if not data:
-                    return
-                buf += data
-            frame_data, buf = buf[:size], buf[size:]
-            arr = np.frombuffer(frame_data, np.uint8)
-            frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-            if frame is None:
-                continue
+            self.conn, addr = self.sock.accept()
+            print(f"Connected by {addr}")
 
-            # Run SLEAP inference and draw keypoints
-            img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            batch = img_rgb[None, ...]
-            res = self.predictor.inference_model.predict_on_batch(batch)
-            for inst_idx, (score, peaks) in enumerate(zip(res["instance_scores"][0], res["instance_peaks"][0])):
-                if score > 0.5:
-                    for kp_idx, (x, y) in enumerate(peaks):
-                        cv2.circle(frame, (int(x), int(y)), 3, (0, 255, 0), -1)
-                        # Write inference row
-                        if self.csv_writer:
-                            self.csv_writer.writerow([self.frame_idx, inst_idx, kp_idx, float(x), float(y), float(score)])
+            buf = b""; first_frame = True
+            while self.running:
+                # Read frame size
+                while len(buf) < 4:
+                    data = self.conn.recv(1024)
+                    if not data:
+                        return
+                    buf += data
+                frame_size = struct.unpack(">I", buf[:4])[0]
+                buf = buf[4:]
 
-            # Write annotated frame to video if enabled
-            if self.writer:
-                self.writer.write(frame)
+                # Read frame data
+                while len(buf) < frame_size:
+                    data = self.conn.recv(frame_size - len(buf))
+                    if not data:
+                        return
+                    buf += data
+                frame_bytes, buf = buf[:frame_size], buf[frame_size:]
 
-            # Update latest_frame for GUI preview and increment frame
-            self.latest_frame = frame
-            self.frame_idx += 1
+                frame = cv2.imdecode(np.frombuffer(frame_bytes, np.uint8), cv2.IMREAD_COLOR)
+                if frame is None:
+                    continue
+
+                # Init VideoWriter
+                if first_frame and self.writer_path:
+                    h, w = frame.shape[:2]
+                    fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+                    self.writer = cv2.VideoWriter(self.writer_path, fourcc, self.video_fps, (w, h))
+                    if not self.writer.isOpened():
+                        print("ERROR: VideoWriter failed to open.")
+                    first_frame = False
+
+                # Run inference
+                vid       = Video.from_numpy(np.expand_dims(frame, 0))
+                lfs       = self.predictor.predict(vid)
+                instances = lfs[0].instances
+
+                                                # Draw keypoints and buffer JSON
+                for inst_idx, inst in enumerate(instances):
+                    pts = inst.points
+                    scrs = inst.scores
+
+                    # Determine coordinate arrays
+                    if isinstance(pts, tuple) and len(pts) == 2 and not isinstance(pts[0], (float, int)):
+                        # Tuple of two arrays/lists
+                        x_coords = np.asarray(pts[0], dtype=float)
+                        y_coords = np.asarray(pts[1], dtype=float)
+                    else:
+                        # Flat sequence of numbers? convert to array
+                        try:
+                            arr = np.asarray(pts, dtype=float).ravel()
+                        except Exception:
+                            print(f"Skipping non-numeric inst.points: {type(pts)}")
+                            continue
+                        if arr.ndim == 2 and arr.shape[1] == 2:
+                            x_coords = arr[:, 0]
+                            y_coords = arr[:, 1]
+                        elif arr.ndim == 1 and arr.size % 2 == 0:
+                            pairs = arr.reshape(-1, 2)
+                            x_coords = pairs[:, 0]
+                            y_coords = pairs[:, 1]
+                        else:
+                            print(f"Skipping unsupported inst.points length {arr.size}")
+                            continue
+
+                    num_kp = len(x_coords)
+                    for kp_idx in range(num_kp):
+                        x = x_coords[kp_idx]
+                        y = y_coords[kp_idx]
+                        score = scrs[kp_idx] if len(scrs) > kp_idx else 0.0
+
+                        # Skip invalid
+                        if not (math.isfinite(x) and math.isfinite(y)):
+                            continue
+
+                        ix, iy = int(x), int(y)
+                        cv2.circle(frame, (ix, iy), 3, (0, 255, 0), -1)
+                        self.json_buffer.append({
+                            'frame':    self.frame_idx,
+                            'instance': inst_idx,
+                            'keypoint': kp_idx,
+                            'x':        float(x),
+                            'y':        float(y),
+                            'score':    float(score),
+                        })
+
+                # Write annotated frame
+                    self.writer.write(frame)
+                with self.lock:
+                    self.latest_frame = frame.copy()
+                self.frame_idx += 1
+
+        except Exception as e:
+            print("Error in receive loop:", e)
+        finally:
+            self.running = False
 
     def _update_preview(self):
-        if hasattr(self, "latest_frame"):
-            rgb = cv2.cvtColor(self.latest_frame, cv2.COLOR_BGR2RGB)
-            h, w, _ = rgb.shape
-            img = QImage(rgb.data, w, h, 3*w, QImage.Format_RGB888)
-            pix = QPixmap.fromImage(img)
-            self.preview.setPixmap(pix.scaled(
-                self.preview.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
-            ))
+        with self.lock:
+            if not hasattr(self, 'latest_frame'):
+                return
+            frame = self.latest_frame.copy()
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        h, w = frame.shape[:2]
+        img = QImage(rgb.data, w, h, 3*w, QImage.Format_RGB888)
+        pix = QPixmap.fromImage(img).scaled(
+            self.preview.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+        )
+        self.preview.setPixmap(pix)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     app = QApplication(sys.argv)
     gui = ReceiverGUI()
     gui.show()
     sys.exit(app.exec_())
+

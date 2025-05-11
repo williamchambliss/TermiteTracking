@@ -1,6 +1,5 @@
 # AI-Powered Termite Tracking System
-Current: Reciever Gui is working and am about to test if the whole system works
-To activate sleap on my laptop: conda activate sleap THEN sleap-label THEN python reciever_gui 
+Current: Reciever Gui is working and the whole thing kinda works, need to make sure on the same ip
 
 ## Overview
 

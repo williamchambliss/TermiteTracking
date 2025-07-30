@@ -1,4 +1,3 @@
-# receiver_gui.py
 import sys
 import threading
 import socket
@@ -61,18 +60,25 @@ class ReceiverGUI(QWidget):
         self.btnRun.clicked.connect(self.start_receiving)
         self.btnStop.clicked.connect(self.stop_receiving)
 
-        self.sock        = None
-        self.conn        = None
-        self.thread      = None
-        self.running     = False
-        self.predictor   = None
-        self.timer       = QTimer()
+        # Network & threading
+        self.sock = None
+        self.running = False
+        self.accept_thread = None
+        self.client_threads = []
+        self.clients_lock = threading.Lock()
+
+        # SLEAP and video
+        self.predictor = None
+        self.timer = QTimer()
         self.timer.timeout.connect(self._update_preview)
-        self.writer      = None
+        self.writer = None
         self.writer_path = None
-        self.video_fps   = 5
+        self.video_fps = 5
         self.json_buffer = []
-        self.frame_idx   = 0
+        self.frame_idx = 0
+
+        # Latest frame for preview
+        self.latest_frame = None
 
         self.setWindowTitle("SLEAP Receiver")
         self.resize(800, 600)
@@ -86,11 +92,11 @@ class ReceiverGUI(QWidget):
         if self.running:
             print("Already running")
             return
-        self.frame_idx   = 0
+        self.frame_idx = 0
         self.json_buffer = []
 
         centroid_dir = self.centroidPath.text().strip()
-        pose_dir     = self.posePath.text().strip()
+        pose_dir = self.posePath.text().strip()
         if not centroid_dir or not pose_dir:
             print("Please specify both centroid and pose model directories.")
             return
@@ -116,23 +122,40 @@ class ReceiverGUI(QWidget):
             self.json_path = None
 
         self.running = True
-        self.thread = threading.Thread(target=self._recv_loop, daemon=True)
-        self.thread.start()
+        # Create and start the accept thread
+        self.accept_thread = threading.Thread(target=self.accept_clients, daemon=True)
+        self.accept_thread.start()
         self.timer.start(30)
 
     def stop_receiving(self):
+        print("Stopping receiver...")
         self.running = False
         self.timer.stop()
 
-        if self.conn:
-            self.conn.close()
-            self.conn = None
+        # Close all client connections
+        with self.clients_lock:
+            for client in self.client_threads:
+                if hasattr(client, 'conn'):
+                    try:
+                        client.conn.shutdown(socket.SHUT_RDWR)
+                        client.conn.close()
+                    except Exception:
+                        pass
+            self.client_threads.clear()
+
+        # Close server socket
         if self.sock:
+            try:
+                self.sock.shutdown(socket.SHUT_RDWR)
+            except Exception:
+                pass
             self.sock.close()
             self.sock = None
+
         if self.writer:
             self.writer.release()
             print(f"Video saved to {self.writer_path}")
+            self.writer = None
 
         if self.json_path:
             with open(self.json_path, 'w') as f:
@@ -141,34 +164,51 @@ class ReceiverGUI(QWidget):
 
         print("Stopped receiving.")
 
-    def _recv_loop(self):
+    def accept_clients(self):
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.sock.bind(("0.0.0.0", 5000))
-            self.sock.listen(1)
+            self.sock.listen(5)
             print("Server listening on port 5000")
 
-            self.conn, addr = self.sock.accept()
-            print(f"Connected by {addr}")
-
-            buf = b""
-            first_frame = True
             while self.running:
+                try:
+                    self.sock.settimeout(1.0)  # To periodically check self.running
+                    conn, addr = self.sock.accept()
+                except socket.timeout:
+                    continue
+                print(f"Connected by {addr}")
+
+                client_thread = threading.Thread(target=self.handle_client, args=(conn,), daemon=True)
+                client_thread.conn = conn  # Attach conn for later cleanup
+                with self.clients_lock:
+                    self.client_threads.append(client_thread)
+                client_thread.start()
+        except Exception as e:
+            print("Error in accept_clients:", e)
+
+    def handle_client(self, conn):
+        buf = b""
+        first_frame = True
+
+        try:
+            while self.running:
+                # Read 4-byte frame size
                 while len(buf) < 4:
-                    data = self.conn.recv(1024)
+                    data = conn.recv(1024)
                     if not data:
-                        print("No data received, closing connection.")
-                        self.stop_receiving()
+                        print("Client disconnected")
                         return
                     buf += data
                 frame_size = struct.unpack(">I", buf[:4])[0]
                 buf = buf[4:]
 
+                # Read full frame bytes
                 while len(buf) < frame_size:
-                    data = self.conn.recv(frame_size - len(buf))
+                    data = conn.recv(frame_size - len(buf))
                     if not data:
-                        print("No data received during frame, closing connection.")
-                        self.stop_receiving()
+                        print("Client disconnected during frame data")
                         return
                     buf += data
                 frame_bytes, buf = buf[:frame_size], buf[frame_size:]
@@ -180,7 +220,7 @@ class ReceiverGUI(QWidget):
 
                 if first_frame and self.writer_path:
                     h, w = frame.shape[:2]
-                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Use mp4v codec for mp4 files
+                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
                     self.writer = cv2.VideoWriter(self.writer_path, fourcc, self.video_fps, (w, h))
                     if not self.writer.isOpened():
                         print("ERROR: VideoWriter failed to open.")
@@ -189,11 +229,11 @@ class ReceiverGUI(QWidget):
                         print("VideoWriter opened.")
                     first_frame = False
 
+                # Run SLEAP inference & draw keypoints
                 vid = Video.from_numpy(np.expand_dims(frame, 0))
                 lfs = self.predictor.predict(vid)
                 instances = lfs[0].instances
 
-                # Draw keypoints and buffer JSON
                 for inst_idx, inst in enumerate(instances):
                     pts = inst.points
                     scrs = inst.scores
@@ -238,7 +278,6 @@ class ReceiverGUI(QWidget):
                             'score':    float(score),
                         })
 
-                # Write annotated frame AFTER drawing all keypoints
                 if self.writer:
                     self.writer.write(frame)
 
@@ -247,13 +286,18 @@ class ReceiverGUI(QWidget):
                 self.frame_idx += 1
 
         except Exception as e:
-            print("Error in receive loop:", e)
+            print("Error handling client:", e)
         finally:
-            self.running = False
+            try:
+                conn.shutdown(socket.SHUT_RDWR)
+                conn.close()
+            except Exception:
+                pass
+            print("Client connection closed")
 
     def _update_preview(self):
         with self.lock:
-            if not hasattr(self, 'latest_frame'):
+            if self.latest_frame is None:
                 return
             frame = self.latest_frame.copy()
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)

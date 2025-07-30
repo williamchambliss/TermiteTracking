@@ -158,6 +158,7 @@ class ReceiverGUI(QWidget):
                     data = self.conn.recv(1024)
                     if not data:
                         print("No data received, closing connection.")
+                        self.stop_receiving()
                         return
                     buf += data
                 frame_size = struct.unpack(">I", buf[:4])[0]
@@ -167,6 +168,7 @@ class ReceiverGUI(QWidget):
                     data = self.conn.recv(frame_size - len(buf))
                     if not data:
                         print("No data received during frame, closing connection.")
+                        self.stop_receiving()
                         return
                     buf += data
                 frame_bytes, buf = buf[:frame_size], buf[frame_size:]

@@ -1,53 +1,66 @@
 import socket
 import struct
 import subprocess
-import cv2
-import numpy as np
+import threading
+import queue
+import time
 
 # Server (PC) IP & Port
-SERVER_IP = "192.168.4.71"  # <-- your PC's IP
+PC_IP_ADDRESS = "192.168.4.71"  # <-- your PC's IP
 PORT = 5000
 
-# Start libcamera-vid to output MJPEG directly
-cmd = [
+# Queue for frame buffering
+frame_queue = queue.Queue(maxsize=50)
+
+# Launch libcamera-vid
+proc = subprocess.Popen([
     "libcamera-vid",
-    "-t", "0",                      # no timeout (run forever)
-    "--inline",                    # needed for MJPEG streaming
-    "--width", "2000",
-    "--height", "2000",
-    "--framerate", "1",
+    "--width", "640",
+    "--height", "480",
+    "--framerate", "10",
     "--codec", "mjpeg",
-    "-o", "-"                      # output to stdout
-]
+    "-o", "-"
+], stdout=subprocess.PIPE, bufsize=0)
 
-print("Starting libcamera-vid...")
-stream = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-
+# Socket setup
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.connect((SERVER_IP, PORT))
-print("Connected to PC.")
+sock.connect(("PC_IP_ADDRESS", 5000))
 
-buffer = b""
-
-try:
+def capture_loop():
     while True:
-        buffer += stream.stdout.read(1024)
+        # Read JPEG frame length (2-byte MJPEG marker + JPEG header)
+        start = proc.stdout.read(2)
+        if not start:
+            break
+        if start != b'\xff\xd8':
+            continue
+        jpeg_data = start
+        while True:
+            byte = proc.stdout.read(1)
+            if not byte:
+                break
+            jpeg_data += byte
+            if jpeg_data[-2:] == b'\xff\xd9':
+                break
+        try:
+            frame_queue.put_nowait(jpeg_data)
+        except queue.Full:
+            print("Dropped frame: queue full")
 
-        # Look for JPEG start and end markers
-        start = buffer.find(b'\xff\xd8')
-        end = buffer.find(b'\xff\xd9')
-
-        if start != -1 and end != -1 and end > start:
-            jpeg_data = buffer[start:end+2]
-            buffer = buffer[end+2:]
-
-            # Send frame size and data
+def sender_loop():
+    while True:
+        jpeg_data = frame_queue.get()
+        try:
             sock.sendall(struct.pack(">I", len(jpeg_data)))
             sock.sendall(jpeg_data)
+        except BrokenPipeError:
+            break
 
-except KeyboardInterrupt:
-    print("Stopping capture...")
+# Start threads
+threading.Thread(target=capture_loop, daemon=True).start()
+threading.Thread(target=sender_loop, daemon=True).start()
 
-finally:
-    stream.terminate()
-    sock.close()
+# Keep alive
+while True:
+    time.sleep(1)
+

@@ -5,6 +5,7 @@ import struct
 import cv2
 import numpy as np
 import math
+import time
 import sleap
 from sleap.nn.inference import load_model
 from sleap import Video
@@ -16,6 +17,12 @@ from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QImage, QPixmap
 import json
 import os
+
+
+# Adjustable batch size at the top
+BATCH_SIZE = 32
+BATCH_TIMEOUT = 0.5  # seconds to wait for filling batch before flushing
+
 
 class ReceiverGUI(QWidget):
     def __init__(self):
@@ -73,7 +80,7 @@ class ReceiverGUI(QWidget):
         self.timer.timeout.connect(self._update_preview)
         self.writer = None
         self.writer_path = None
-        self.video_fps = 5
+        self.video_fps = 1   #Change this to match the stream on the pi
         self.json_buffer = []
         self.frame_idx = 0
 
@@ -122,7 +129,6 @@ class ReceiverGUI(QWidget):
             self.json_path = None
 
         self.running = True
-        # Create and start the accept thread
         self.accept_thread = threading.Thread(target=self.accept_clients, daemon=True)
         self.accept_thread.start()
         self.timer.start(30)
@@ -188,9 +194,78 @@ class ReceiverGUI(QWidget):
         except Exception as e:
             print("Error in accept_clients:", e)
 
+    def _process_batch(self, frame_batch, frame_indices):
+        """Run inference on a batch and handle results in order."""
+        if not frame_batch:
+            return
+
+        print(f"Running inference on batch of size {len(frame_batch)}. Queue size before processing: {len(frame_batch)}")
+
+        batch_vid = Video.from_numpy(np.array(frame_batch))
+        lfs_batch = self.predictor.predict(batch_vid)
+
+        for b_idx, lfs in enumerate(lfs_batch):
+            curr_frame = frame_batch[b_idx].copy()
+            instances = lfs.instances
+
+            for inst_idx, inst in enumerate(instances):
+                pts = inst.points
+                scrs = inst.scores
+
+                if isinstance(pts, tuple) and len(pts) == 2 and not isinstance(pts[0], (float, int)):
+                    x_coords = np.asarray(pts[0], dtype=float)
+                    y_coords = np.asarray(pts[1], dtype=float)
+                else:
+                    try:
+                        arr = np.asarray(pts, dtype=float).ravel()
+                    except Exception:
+                        print(f"Skipping non-numeric inst.points: {type(pts)}")
+                        continue
+                    if arr.ndim == 2 and arr.shape[1] == 2:
+                        x_coords = arr[:, 0]
+                        y_coords = arr[:, 1]
+                    elif arr.ndim == 1 and arr.size % 2 == 0:
+                        pairs = arr.reshape(-1, 2)
+                        x_coords = pairs[:, 0]
+                        y_coords = pairs[:, 1]
+                    else:
+                        print(f"Skipping unsupported inst.points length {arr.size}")
+                        continue
+
+                num_kp = len(x_coords)
+                for kp_idx in range(num_kp):
+                    x = x_coords[kp_idx]
+                    y = y_coords[kp_idx]
+                    score = scrs[kp_idx] if len(scrs) > kp_idx else 0.0
+
+                    if not (math.isfinite(x) and math.isfinite(y)):
+                        continue
+
+                    ix, iy = int(x), int(y)
+                    cv2.circle(curr_frame, (ix, iy), 3, (0, 255, 0), -1)
+                    self.json_buffer.append({
+                        'frame':    frame_indices[b_idx],
+                        'instance': inst_idx,
+                        'keypoint': kp_idx,
+                        'x':        float(x),
+                        'y':        float(y),
+                        'score':    float(score),
+                    })
+
+            if self.writer:
+                self.writer.write(curr_frame)
+
+            # Update preview only for last frame in batch to avoid excessive updates
+            if b_idx == len(frame_batch) - 1:
+                with self.lock:
+                    self.latest_frame = curr_frame.copy()
+
     def handle_client(self, conn):
         buf = b""
         first_frame = True
+        frame_batch = []
+        frame_indices = []
+        last_frame_time = time.time()
 
         try:
             while self.running:
@@ -199,6 +274,8 @@ class ReceiverGUI(QWidget):
                     data = conn.recv(1024)
                     if not data:
                         print("Client disconnected")
+                        # Flush remaining batch before return
+                        self._process_batch(frame_batch, frame_indices)
                         return
                     buf += data
                 frame_size = struct.unpack(">I", buf[:4])[0]
@@ -209,6 +286,8 @@ class ReceiverGUI(QWidget):
                     data = conn.recv(frame_size - len(buf))
                     if not data:
                         print("Client disconnected during frame data")
+                        # Flush remaining batch before return
+                        self._process_batch(frame_batch, frame_indices)
                         return
                     buf += data
                 frame_bytes, buf = buf[:frame_size], buf[frame_size:]
@@ -229,64 +308,27 @@ class ReceiverGUI(QWidget):
                         print("VideoWriter opened.")
                     first_frame = False
 
-                # Run SLEAP inference & draw keypoints
-                vid = Video.from_numpy(np.expand_dims(frame, 0))
-                lfs = self.predictor.predict(vid)
-                instances = lfs[0].instances
-
-                for inst_idx, inst in enumerate(instances):
-                    pts = inst.points
-                    scrs = inst.scores
-
-                    if isinstance(pts, tuple) and len(pts) == 2 and not isinstance(pts[0], (float, int)):
-                        x_coords = np.asarray(pts[0], dtype=float)
-                        y_coords = np.asarray(pts[1], dtype=float)
-                    else:
-                        try:
-                            arr = np.asarray(pts, dtype=float).ravel()
-                        except Exception:
-                            print(f"Skipping non-numeric inst.points: {type(pts)}")
-                            continue
-                        if arr.ndim == 2 and arr.shape[1] == 2:
-                            x_coords = arr[:, 0]
-                            y_coords = arr[:, 1]
-                        elif arr.ndim == 1 and arr.size % 2 == 0:
-                            pairs = arr.reshape(-1, 2)
-                            x_coords = pairs[:, 0]
-                            y_coords = pairs[:, 1]
-                        else:
-                            print(f"Skipping unsupported inst.points length {arr.size}")
-                            continue
-
-                    num_kp = len(x_coords)
-                    for kp_idx in range(num_kp):
-                        x = x_coords[kp_idx]
-                        y = y_coords[kp_idx]
-                        score = scrs[kp_idx] if len(scrs) > kp_idx else 0.0
-
-                        if not (math.isfinite(x) and math.isfinite(y)):
-                            continue
-
-                        ix, iy = int(x), int(y)
-                        cv2.circle(frame, (ix, iy), 3, (0, 255, 0), -1)
-                        self.json_buffer.append({
-                            'frame':    self.frame_idx,
-                            'instance': inst_idx,
-                            'keypoint': kp_idx,
-                            'x':        float(x),
-                            'y':        float(y),
-                            'score':    float(score),
-                        })
-
-                if self.writer:
-                    self.writer.write(frame)
-
-                with self.lock:
-                    self.latest_frame = frame.copy()
+                frame_batch.append(frame)
+                frame_indices.append(self.frame_idx)
                 self.frame_idx += 1
+                last_frame_time = time.time()
+
+                # If batch full, process it
+                if len(frame_batch) == BATCH_SIZE:
+                    self._process_batch(frame_batch, frame_indices)
+                    frame_batch.clear()
+                    frame_indices.clear()
+
+                # Check for timeout to flush partial batch
+                elif frame_batch and (time.time() - last_frame_time) > BATCH_TIMEOUT:
+                    self._process_batch(frame_batch, frame_indices)
+                    frame_batch.clear()
+                    frame_indices.clear()
 
         except Exception as e:
             print("Error handling client:", e)
+            # Flush any remaining frames on error
+            self._process_batch(frame_batch, frame_indices)
         finally:
             try:
                 conn.shutdown(socket.SHUT_RDWR)
@@ -307,6 +349,7 @@ class ReceiverGUI(QWidget):
             self.preview.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
         )
         self.preview.setPixmap(pix)
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

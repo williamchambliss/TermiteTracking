@@ -1,0 +1,1467 @@
+{
+  "version": "2.0.0",
+  "skeletons": [
+    {
+      "directed": true,
+      "graph": {
+        "name": "Skeleton-0",
+        "num_edges_inserted": 17
+      },
+      "links": [
+        {
+          "edge_insert_idx": 1,
+          "key": 0,
+          "source": 12,
+          "target": 15,
+          "type": {
+            "py/reduce": [
+              {
+                "py/type": "sleap.skeleton.EdgeType"
+              },
+              {
+                "py/tuple": [
+                  1
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "key": 0,
+          "source": 12,
+          "target": 4,
+          "type": {
+            "py/reduce": [
+              {
+                "py/type": "sleap.skeleton.EdgeType"
+              },
+              {
+                "py/tuple": [
+                  2
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "edge_insert_idx": 2,
+          "key": 0,
+          "source": 15,
+          "target": 10,
+          "type": {
+            "py/id": 1
+          }
+        },
+        {
+          "key": 0,
+          "source": 15,
+          "target": 13,
+          "type": {
+            "py/id": 2
+          }
+        },
+        {
+          "edge_insert_idx": 9,
+          "key": 0,
+          "source": 10,
+          "target": 2,
+          "type": {
+            "py/id": 1
+          }
+        },
+        {
+          "key": 0,
+          "source": 10,
+          "target": 14,
+          "type": {
+            "py/id": 2
+          }
+        },
+        {
+          "edge_insert_idx": 3,
+          "key": 0,
+          "source": 4,
+          "target": 13,
+          "type": {
+            "py/id": 1
+          }
+        },
+        {
+          "key": 0,
+          "source": 4,
+          "target": 12,
+          "type": {
+            "py/id": 2
+          }
+        },
+        {
+          "edge_insert_idx": 4,
+          "key": 0,
+          "source": 13,
+          "target": 14,
+          "type": {
+            "py/id": 1
+          }
+        },
+        {
+          "key": 0,
+          "source": 13,
+          "target": 15,
+          "type": {
+            "py/id": 2
+          }
+        },
+        {
+          "key": 0,
+          "source": 14,
+          "target": 10,
+          "type": {
+            "py/id": 2
+          }
+        },
+        {
+          "edge_insert_idx": 5,
+          "key": 0,
+          "source": 2,
+          "target": 0,
+          "type": {
+            "py/id": 1
+          }
+        },
+        {
+          "edge_insert_idx": 10,
+          "key": 0,
+          "source": 2,
+          "target": 14,
+          "type": {
+            "py/id": 1
+          }
+        },
+        {
+          "edge_insert_idx": 6,
+          "key": 0,
+          "source": 0,
+          "target": 16,
+          "type": {
+            "py/id": 1
+          }
+        },
+        {
+          "edge_insert_idx": 7,
+          "key": 0,
+          "source": 16,
+          "target": 5,
+          "type": {
+            "py/id": 1
+          }
+        },
+        {
+          "edge_insert_idx": 11,
+          "key": 0,
+          "source": 16,
+          "target": 11,
+          "type": {
+            "py/id": 1
+          }
+        },
+        {
+          "edge_insert_idx": 12,
+          "key": 0,
+          "source": 16,
+          "target": 6,
+          "type": {
+            "py/id": 1
+          }
+        },
+        {
+          "edge_insert_idx": 13,
+          "key": 0,
+          "source": 16,
+          "target": 3,
+          "type": {
+            "py/id": 1
+          }
+        },
+        {
+          "edge_insert_idx": 14,
+          "key": 0,
+          "source": 16,
+          "target": 8,
+          "type": {
+            "py/id": 1
+          }
+        },
+        {
+          "edge_insert_idx": 15,
+          "key": 0,
+          "source": 16,
+          "target": 9,
+          "type": {
+            "py/id": 1
+          }
+        },
+        {
+          "edge_insert_idx": 16,
+          "key": 0,
+          "source": 16,
+          "target": 7,
+          "type": {
+            "py/id": 1
+          }
+        },
+        {
+          "edge_insert_idx": 8,
+          "key": 0,
+          "source": 5,
+          "target": 1,
+          "type": {
+            "py/id": 1
+          }
+        },
+        {
+          "key": 0,
+          "source": 11,
+          "target": 7,
+          "type": {
+            "py/id": 2
+          }
+        },
+        {
+          "key": 0,
+          "source": 6,
+          "target": 3,
+          "type": {
+            "py/id": 2
+          }
+        },
+        {
+          "key": 0,
+          "source": 3,
+          "target": 6,
+          "type": {
+            "py/id": 2
+          }
+        },
+        {
+          "key": 0,
+          "source": 8,
+          "target": 9,
+          "type": {
+            "py/id": 2
+          }
+        },
+        {
+          "key": 0,
+          "source": 9,
+          "target": 8,
+          "type": {
+            "py/id": 2
+          }
+        },
+        {
+          "key": 0,
+          "source": 7,
+          "target": 11,
+          "type": {
+            "py/id": 2
+          }
+        }
+      ],
+      "multigraph": true,
+      "nodes": [
+        {
+          "id": 12
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 10
+        },
+        {
+          "id": 4
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 2
+        },
+        {
+          "id": 0
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 5
+        },
+        {
+          "id": 1
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 6
+        },
+        {
+          "id": 3
+        },
+        {
+          "id": 8
+        },
+        {
+          "id": 9
+        },
+        {
+          "id": 7
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "pronotumfront",
+      "weight": 1.0
+    },
+    {
+      "name": "abdomentip",
+      "weight": 1.0
+    },
+    {
+      "name": "headtip",
+      "weight": 1.0
+    },
+    {
+      "name": "middlelegl",
+      "weight": 1.0
+    },
+    {
+      "name": "antennatipl",
+      "weight": 1.0
+    },
+    {
+      "name": "abdomenfront",
+      "weight": 1.0
+    },
+    {
+      "name": "middlelegr",
+      "weight": 1.0
+    },
+    {
+      "name": "frontlegr",
+      "weight": 1.0
+    },
+    {
+      "name": "hindlegr",
+      "weight": 1.0
+    },
+    {
+      "name": "hindlegl",
+      "weight": 1.0
+    },
+    {
+      "name": "antennabaser",
+      "weight": 1.0
+    },
+    {
+      "name": "frontlegl",
+      "weight": 1.0
+    },
+    {
+      "name": "antennatipr",
+      "weight": 1.0
+    },
+    {
+      "name": "antennamiddlel",
+      "weight": 1.0
+    },
+    {
+      "name": "antennabasel",
+      "weight": 1.0
+    },
+    {
+      "name": "antennamiddler",
+      "weight": 1.0
+    },
+    {
+      "name": "pronotumend",
+      "weight": 1.0
+    }
+  ],
+  "videos": [
+    {
+      "backend": {
+        "filename": "C:/Users/willi/Documents/Ret_Fla/test\\output.mp4",
+        "grayscale": false,
+        "bgr": true,
+        "dataset": "",
+        "input_format": ""
+      }
+    }
+  ],
+  "tracks": [],
+  "suggestions": [],
+  "negative_anchors": {},
+  "provenance": {},
+  "labels": [
+    {
+      "video": "0",
+      "frame_idx": 0,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 1,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 2,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 3,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 4,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 5,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 6,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 7,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 8,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 9,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 10,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 11,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 12,
+      "_instances": [
+        {
+          "skeleton": "0",
+          "track": null,
+          "from_predicted": null,
+          "score": 0.3564263582229614,
+          "tracking_score": 0.0,
+          "_points": {
+            "12": {
+              "x": 498.15936279296875,
+              "y": 210.49827575683594,
+              "visible": true,
+              "complete": false,
+              "score": 0.2509317398071289
+            },
+            "15": {
+              "x": 496.3504333496094,
+              "y": 207.83168029785156,
+              "visible": true,
+              "complete": false,
+              "score": 0.5043563842773438
+            },
+            "10": {
+              "x": 496.15362548828125,
+              "y": 199.86781311035156,
+              "visible": true,
+              "complete": false,
+              "score": 0.6113205552101135
+            },
+            "13": {
+              "x": 498.1639099121094,
+              "y": 181.94598388671875,
+              "visible": true,
+              "complete": false,
+              "score": 0.4169970154762268
+            },
+            "14": {
+              "x": 492.33782958984375,
+              "y": 185.906005859375,
+              "visible": true,
+              "complete": false,
+              "score": 0.5188254714012146
+            },
+            "2": {
+              "x": 498.2585754394531,
+              "y": 197.87899780273438,
+              "visible": true,
+              "complete": false,
+              "score": 0.6951163411140442
+            },
+            "0": {
+              "x": 486.2777099609375,
+              "y": 194.1475067138672,
+              "visible": true,
+              "complete": false,
+              "score": 0.8095567226409912
+            },
+            "16": {
+              "x": 482.4364013671875,
+              "y": 196.07705688476562,
+              "visible": true,
+              "complete": false,
+              "score": 0.4868289828300476
+            },
+            "11": {
+              "x": 486.23895263671875,
+              "y": 189.79946899414062,
+              "visible": true,
+              "complete": false,
+              "score": 0.5296227335929871
+            },
+            "6": {
+              "x": 478.25360107421875,
+              "y": 207.8519744873047,
+              "visible": true,
+              "complete": false,
+              "score": 0.28440889716148376
+            },
+            "3": {
+              "x": 476.0723571777344,
+              "y": 186.11952209472656,
+              "visible": true,
+              "complete": false,
+              "score": 0.35669174790382385
+            },
+            "7": {
+              "x": 486.20330810546875,
+              "y": 200.05902099609375,
+              "visible": true,
+              "complete": false,
+              "score": 0.3495689034461975
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "0",
+      "frame_idx": 13,
+      "_instances": [
+        {
+          "skeleton": "0",
+          "track": null,
+          "from_predicted": null,
+          "score": 0.40882211923599243,
+          "tracking_score": 0.0,
+          "_points": {
+            "15": {
+              "x": 502.281982421875,
+              "y": 266.1072692871094,
+              "visible": true,
+              "complete": false,
+              "score": 0.33220964670181274
+            },
+            "10": {
+              "x": 496.0782165527344,
+              "y": 246.62673950195312,
+              "visible": true,
+              "complete": false,
+              "score": 0.46807244420051575
+            },
+            "13": {
+              "x": 504.1080322265625,
+              "y": 244.43405151367188,
+              "visible": true,
+              "complete": false,
+              "score": 0.26184359192848206
+            },
+            "14": {
+              "x": 496.2738342285156,
+              "y": 242.47329711914062,
+              "visible": true,
+              "complete": false,
+              "score": 0.4613804221153259
+            },
+            "2": {
+              "x": 502.29736328125,
+              "y": 256.3567810058594,
+              "visible": true,
+              "complete": false,
+              "score": 0.5130549073219299
+            },
+            "0": {
+              "x": 492.11004638671875,
+              "y": 254.32066345214844,
+              "visible": true,
+              "complete": false,
+              "score": 0.8012810349464417
+            },
+            "16": {
+              "x": 490.071044921875,
+              "y": 256.4859313964844,
+              "visible": true,
+              "complete": false,
+              "score": 0.48467913269996643
+            },
+            "11": {
+              "x": 490.3037414550781,
+              "y": 248.50051879882812,
+              "visible": true,
+              "complete": false,
+              "score": 0.5016160607337952
+            },
+            "3": {
+              "x": 481.9035339355469,
+              "y": 248.41371154785156,
+              "visible": true,
+              "complete": false,
+              "score": 0.24582725763320923
+            },
+            "7": {
+              "x": 496.1033020019531,
+              "y": 250.58441162109375,
+              "visible": true,
+              "complete": false,
+              "score": 0.3207976222038269
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "0",
+      "frame_idx": 14,
+      "_instances": [
+        {
+          "skeleton": "0",
+          "track": null,
+          "from_predicted": null,
+          "score": 0.36129215359687805,
+          "tracking_score": 0.0,
+          "_points": {
+            "15": {
+              "x": 502.4515075683594,
+              "y": 266.0751647949219,
+              "visible": true,
+              "complete": false,
+              "score": 0.23436696827411652
+            },
+            "10": {
+              "x": 494.3169250488281,
+              "y": 246.41964721679688,
+              "visible": true,
+              "complete": false,
+              "score": 0.5031282305717468
+            },
+            "14": {
+              "x": 494.66485595703125,
+              "y": 240.6365966796875,
+              "visible": true,
+              "complete": false,
+              "score": 0.41730940341949463
+            },
+            "2": {
+              "x": 502.4542541503906,
+              "y": 256.3363952636719,
+              "visible": true,
+              "complete": false,
+              "score": 0.5320470333099365
+            },
+            "0": {
+              "x": 490.5442810058594,
+              "y": 252.53762817382812,
+              "visible": true,
+              "complete": false,
+              "score": 0.8015679121017456
+            },
+            "16": {
+              "x": 488.56439208984375,
+              "y": 256.26336669921875,
+              "visible": true,
+              "complete": false,
+              "score": 0.44410473108291626
+            },
+            "11": {
+              "x": 490.5037536621094,
+              "y": 250.32159423828125,
+              "visible": true,
+              "complete": false,
+              "score": 0.4160436987876892
+            },
+            "7": {
+              "x": 496.12762451171875,
+              "y": 250.39779663085938,
+              "visible": true,
+              "complete": false,
+              "score": 0.3162534832954407
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "0",
+      "frame_idx": 15,
+      "_instances": [
+        {
+          "skeleton": "0",
+          "track": null,
+          "from_predicted": null,
+          "score": 0.22769998013973236,
+          "tracking_score": 0.0,
+          "_points": {
+            "15": {
+              "x": 503.9840087890625,
+              "y": 270.22900390625,
+              "visible": true,
+              "complete": false,
+              "score": 0.26958850026130676
+            },
+            "10": {
+              "x": 492.0893859863281,
+              "y": 252.41091918945312,
+              "visible": true,
+              "complete": false,
+              "score": 0.6998628377914429
+            },
+            "13": {
+              "x": 505.74725341796875,
+              "y": 258.5386047363281,
+              "visible": true,
+              "complete": false,
+              "score": 0.283744752407074
+            },
+            "14": {
+              "x": 499.9534912109375,
+              "y": 262.2718505859375,
+              "visible": true,
+              "complete": false,
+              "score": 0.48706722259521484
+            },
+            "2": {
+              "x": 492.2059326171875,
+              "y": 248.58682250976562,
+              "visible": true,
+              "complete": false,
+              "score": 0.60280442237854
+            },
+            "0": {
+              "x": 490.15362548828125,
+              "y": 260.2674865722656,
+              "visible": true,
+              "complete": false,
+              "score": 0.8312320709228516
+            },
+            "16": {
+              "x": 488.0658874511719,
+              "y": 262.33660888671875,
+              "visible": true,
+              "complete": false,
+              "score": 0.46117091178894043
+            },
+            "11": {
+              "x": 490.08905029296875,
+              "y": 258.451171875,
+              "visible": true,
+              "complete": false,
+              "score": 0.411186546087265
+            },
+            "9": {
+              "x": 473.95062255859375,
+              "y": 267.8051452636719,
+              "visible": true,
+              "complete": false,
+              "score": 0.22535286843776703
+            },
+            "7": {
+              "x": 494.13934326171875,
+              "y": 258.3512268066406,
+              "visible": true,
+              "complete": false,
+              "score": 0.23903866112232208
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "0",
+      "frame_idx": 16,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 17,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 18,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 19,
+      "_instances": [
+        {
+          "skeleton": "0",
+          "track": null,
+          "from_predicted": null,
+          "score": 0.424487829208374,
+          "tracking_score": 0.0,
+          "_points": {
+            "10": {
+              "x": 574.1011962890625,
+              "y": 293.86431884765625,
+              "visible": true,
+              "complete": false,
+              "score": 0.4200519323348999
+            },
+            "14": {
+              "x": 572.114013671875,
+              "y": 297.8625793457031,
+              "visible": true,
+              "complete": false,
+              "score": 0.47701725363731384
+            },
+            "2": {
+              "x": 570.155517578125,
+              "y": 294.1739501953125,
+              "visible": true,
+              "complete": false,
+              "score": 0.43241915106773376
+            },
+            "0": {
+              "x": 577.9617919921875,
+              "y": 295.78057861328125,
+              "visible": true,
+              "complete": false,
+              "score": 0.53764808177948
+            },
+            "16": {
+              "x": 582.1981201171875,
+              "y": 294.2802734375,
+              "visible": true,
+              "complete": false,
+              "score": 0.5141579508781433
+            },
+            "5": {
+              "x": 599.8554077148438,
+              "y": 293.80419921875,
+              "visible": true,
+              "complete": false,
+              "score": 0.4589102864265442
+            },
+            "1": {
+              "x": 542.5116577148438,
+              "y": 295.6444091796875,
+              "visible": true,
+              "complete": false,
+              "score": 0.21482695639133453
+            },
+            "11": {
+              "x": 583.8008422851562,
+              "y": 303.57476806640625,
+              "visible": true,
+              "complete": false,
+              "score": 0.23933802545070648
+            },
+            "6": {
+              "x": 557.6846313476562,
+              "y": 300.3895263671875,
+              "visible": true,
+              "complete": false,
+              "score": 0.2367810606956482
+            },
+            "3": {
+              "x": 593.9823608398438,
+              "y": 303.7626037597656,
+              "visible": true,
+              "complete": false,
+              "score": 0.4527116119861603
+            },
+            "8": {
+              "x": 550.2098388671875,
+              "y": 299.67401123046875,
+              "visible": true,
+              "complete": false,
+              "score": 0.5410691499710083
+            },
+            "9": {
+              "x": 554.08447265625,
+              "y": 292.18414306640625,
+              "visible": true,
+              "complete": false,
+              "score": 0.2785550653934479
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "0",
+      "frame_idx": 20,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 21,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 22,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 23,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 24,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 25,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 26,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 27,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 28,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 29,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 30,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 31,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 32,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 33,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 34,
+      "_instances": [
+        {
+          "skeleton": "0",
+          "track": null,
+          "from_predicted": null,
+          "score": 0.6051048040390015,
+          "tracking_score": 0.0,
+          "_points": {
+            "10": {
+              "x": 508.2338562011719,
+              "y": 334.203857421875,
+              "visible": true,
+              "complete": false,
+              "score": 0.875197172164917
+            },
+            "13": {
+              "x": 500.1544494628906,
+              "y": 324.2281188964844,
+              "visible": true,
+              "complete": false,
+              "score": 0.23872315883636475
+            },
+            "14": {
+              "x": 502.2807922363281,
+              "y": 332.140380859375,
+              "visible": true,
+              "complete": false,
+              "score": 0.8615366220474243
+            },
+            "2": {
+              "x": 504.625244140625,
+              "y": 331.96612548828125,
+              "visible": true,
+              "complete": false,
+              "score": 0.9002547264099121
+            },
+            "0": {
+              "x": 502.0267028808594,
+              "y": 340.41400146484375,
+              "visible": true,
+              "complete": false,
+              "score": 0.9588890671730042
+            },
+            "16": {
+              "x": 498.466064453125,
+              "y": 346.19287109375,
+              "visible": true,
+              "complete": false,
+              "score": 0.9401144981384277
+            },
+            "5": {
+              "x": 492.19171142578125,
+              "y": 358.4044189453125,
+              "visible": true,
+              "complete": false,
+              "score": 0.8994480967521667
+            },
+            "1": {
+              "x": 482.5896911621094,
+              "y": 374.2956237792969,
+              "visible": true,
+              "complete": false,
+              "score": 0.7025078535079956
+            },
+            "11": {
+              "x": 497.7731628417969,
+              "y": 340.0351867675781,
+              "visible": true,
+              "complete": false,
+              "score": 0.41209253668785095
+            },
+            "6": {
+              "x": 504.2942199707031,
+              "y": 356.18341064453125,
+              "visible": true,
+              "complete": false,
+              "score": 0.6928219795227051
+            },
+            "8": {
+              "x": 496.44305419921875,
+              "y": 364.4934997558594,
+              "visible": true,
+              "complete": false,
+              "score": 0.7010366916656494
+            },
+            "9": {
+              "x": 486.14190673828125,
+              "y": 356.3399658203125,
+              "visible": true,
+              "complete": false,
+              "score": 0.6202589273452759
+            },
+            "7": {
+              "x": 508.079833984375,
+              "y": 342.4464111328125,
+              "visible": true,
+              "complete": false,
+              "score": 0.7777181267738342
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "0",
+      "frame_idx": 35,
+      "_instances": [
+        {
+          "skeleton": "0",
+          "track": null,
+          "from_predicted": null,
+          "score": 0.3110954165458679,
+          "tracking_score": 0.0,
+          "_points": {
+            "15": {
+              "x": 594.3120727539062,
+              "y": 366.30194091796875,
+              "visible": true,
+              "complete": false,
+              "score": 0.4531576633453369
+            },
+            "10": {
+              "x": 588.0447387695312,
+              "y": 361.9153747558594,
+              "visible": true,
+              "complete": false,
+              "score": 0.9982409477233887
+            },
+            "13": {
+              "x": 595.8927001953125,
+              "y": 356.2862243652344,
+              "visible": true,
+              "complete": false,
+              "score": 0.20517002046108246
+            },
+            "14": {
+              "x": 589.7420654296875,
+              "y": 356.1081237792969,
+              "visible": true,
+              "complete": false,
+              "score": 0.8140956163406372
+            },
+            "2": {
+              "x": 590.104736328125,
+              "y": 359.89398193359375,
+              "visible": true,
+              "complete": false,
+              "score": 1.0156042575836182
+            },
+            "0": {
+              "x": 582.1318359375,
+              "y": 356.3154296875,
+              "visible": true,
+              "complete": false,
+              "score": 0.9701902270317078
+            },
+            "16": {
+              "x": 576.183837890625,
+              "y": 356.3149719238281,
+              "visible": true,
+              "complete": false,
+              "score": 0.7623976469039917
+            },
+            "5": {
+              "x": 562.2980346679688,
+              "y": 358.0338134765625,
+              "visible": true,
+              "complete": false,
+              "score": 0.727180004119873
+            },
+            "1": {
+              "x": 542.0671997070312,
+              "y": 360.1827392578125,
+              "visible": true,
+              "complete": false,
+              "score": 0.5152801871299744
+            },
+            "11": {
+              "x": 581.9656372070312,
+              "y": 348.3750305175781,
+              "visible": true,
+              "complete": false,
+              "score": 0.46465811133384705
+            },
+            "6": {
+              "x": 571.8533935546875,
+              "y": 364.1800231933594,
+              "visible": true,
+              "complete": false,
+              "score": 0.4701801538467407
+            },
+            "3": {
+              "x": 569.986083984375,
+              "y": 346.2891845703125,
+              "visible": true,
+              "complete": false,
+              "score": 0.2312782257795334
+            },
+            "8": {
+              "x": 564.0584716796875,
+              "y": 364.01141357421875,
+              "visible": true,
+              "complete": false,
+              "score": 0.4187266528606415
+            },
+            "9": {
+              "x": 562.1768798828125,
+              "y": 350.11297607421875,
+              "visible": true,
+              "complete": false,
+              "score": 0.5033518075942993
+            },
+            "7": {
+              "x": 580.168212890625,
+              "y": 363.99462890625,
+              "visible": true,
+              "complete": false,
+              "score": 0.5310047268867493
+            }
+          }
+        },
+        {
+          "skeleton": "0",
+          "track": null,
+          "from_predicted": null,
+          "score": 0.31766507029533386,
+          "tracking_score": 0.0,
+          "_points": {
+            "10": {
+              "x": 530.3751220703125,
+              "y": 356.4256591796875,
+              "visible": true,
+              "complete": false,
+              "score": 0.3733547627925873
+            },
+            "14": {
+              "x": 528.294677734375,
+              "y": 360.09576416015625,
+              "visible": true,
+              "complete": false,
+              "score": 0.49964645504951477
+            },
+            "2": {
+              "x": 528.3610229492188,
+              "y": 358.31402587890625,
+              "visible": true,
+              "complete": false,
+              "score": 0.3308919370174408
+            },
+            "0": {
+              "x": 530.2542114257812,
+              "y": 359.8388671875,
+              "visible": true,
+              "complete": false,
+              "score": 0.9275321364402771
+            },
+            "16": {
+              "x": 536.3525390625,
+              "y": 358.2401428222656,
+              "visible": true,
+              "complete": false,
+              "score": 0.5804634094238281
+            },
+            "5": {
+              "x": 510.5976867675781,
+              "y": 365.8995666503906,
+              "visible": true,
+              "complete": false,
+              "score": 0.6418190598487854
+            },
+            "1": {
+              "x": 494.46466064453125,
+              "y": 373.8912353515625,
+              "visible": true,
+              "complete": false,
+              "score": 0.954464852809906
+            },
+            "11": {
+              "x": 524.2493896484375,
+              "y": 352.0669860839844,
+              "visible": true,
+              "complete": false,
+              "score": 0.377504825592041
+            },
+            "6": {
+              "x": 546.6061401367188,
+              "y": 348.56658935546875,
+              "visible": true,
+              "complete": false,
+              "score": 0.2883855998516083
+            },
+            "3": {
+              "x": 546.5299072265625,
+              "y": 367.9922790527344,
+              "visible": true,
+              "complete": false,
+              "score": 0.3128269910812378
+            },
+            "8": {
+              "x": 512.5955200195312,
+              "y": 370.37548828125,
+              "visible": true,
+              "complete": false,
+              "score": 0.4702204465866089
+            },
+            "9": {
+              "x": 508.0599060058594,
+              "y": 361.8853454589844,
+              "visible": true,
+              "complete": false,
+              "score": 0.5835807919502258
+            },
+            "7": {
+              "x": 534.1746215820312,
+              "y": 352.0425109863281,
+              "visible": true,
+              "complete": false,
+              "score": 0.2401738315820694
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "0",
+      "frame_idx": 36,
+      "_instances": []
+    },
+    {
+      "video": "0",
+      "frame_idx": 37,
+      "_instances": [
+        {
+          "skeleton": "0",
+          "track": null,
+          "from_predicted": null,
+          "score": 0.5114885568618774,
+          "tracking_score": 0.0,
+          "_points": {
+            "12": {
+              "x": 423.7575378417969,
+              "y": 434.4641418457031,
+              "visible": true,
+              "complete": false,
+              "score": 0.2310015708208084
+            },
+            "15": {
+              "x": 427.6079406738281,
+              "y": 438.53570556640625,
+              "visible": true,
+              "complete": false,
+              "score": 0.6655940413475037
+            },
+            "10": {
+              "x": 433.69671630859375,
+              "y": 442.670166015625,
+              "visible": true,
+              "complete": false,
+              "score": 0.9126993417739868
+            },
+            "4": {
+              "x": 420.0552978515625,
+              "y": 458.5625305175781,
+              "visible": true,
+              "complete": false,
+              "score": 0.3586125373840332
+            },
+            "13": {
+              "x": 425.71417236328125,
+              "y": 454.3211364746094,
+              "visible": true,
+              "complete": false,
+              "score": 0.5844179391860962
+            },
+            "14": {
+              "x": 433.65325927734375,
+              "y": 450.455078125,
+              "visible": true,
+              "complete": false,
+              "score": 0.9101905822753906
+            },
+            "2": {
+              "x": 429.98492431640625,
+              "y": 446.47027587890625,
+              "visible": true,
+              "complete": false,
+              "score": 0.9267674088478088
+            },
+            "0": {
+              "x": 441.6940612792969,
+              "y": 448.4056701660156,
+              "visible": true,
+              "complete": false,
+              "score": 0.8533785343170166
+            },
+            "16": {
+              "x": 446.1285705566406,
+              "y": 448.44476318359375,
+              "visible": true,
+              "complete": false,
+              "score": 0.8619024157524109
+            },
+            "5": {
+              "x": 464.1362609863281,
+              "y": 448.26080322265625,
+              "visible": true,
+              "complete": false,
+              "score": 0.8587499856948853
+            },
+            "1": {
+              "x": 485.2322692871094,
+              "y": 446.439208984375,
+              "visible": true,
+              "complete": false,
+              "score": 0.7683510780334473
+            },
+            "11": {
+              "x": 441.93963623046875,
+              "y": 454.6653747558594,
+              "visible": true,
+              "complete": false,
+              "score": 0.8173738718032837
+            },
+            "6": {
+              "x": 455.7012023925781,
+              "y": 440.1859130859375,
+              "visible": true,
+              "complete": false,
+              "score": 0.7650034427642822
+            },
+            "3": {
+              "x": 455.89288330078125,
+              "y": 456.4225769042969,
+              "visible": true,
+              "complete": false,
+              "score": 0.7105344533920288
+            },
+            "8": {
+              "x": 462.2328186035156,
+              "y": 440.421630859375,
+              "visible": true,
+              "complete": false,
+              "score": 0.48244088888168335
+            },
+            "9": {
+              "x": 465.69873046875,
+              "y": 454.51116943359375,
+              "visible": true,
+              "complete": false,
+              "score": 0.706688642501831
+            },
+            "7": {
+              "x": 441.98175048828125,
+              "y": 440.3426513671875,
+              "visible": true,
+              "complete": false,
+              "score": 0.7767382860183716
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "0",
+      "frame_idx": 38,
+      "_instances": []
+    }
+  ]
+}

@@ -15,16 +15,19 @@ frame_queue = queue.Queue(maxsize=50)
 # Launch libcamera-vid
 proc = subprocess.Popen([
     "libcamera-vid",
-    "--width", "640",
-    "--height", "480",
-    "--framerate", "10",
+    "--width", "1000",
+    "--height", "1000",
+    "--framerate", "1",   # Change this frame rate depending on compute of machine (1 low, 5 high but actually usable)
     "--codec", "mjpeg",
+    #"--quality", "25",  
+    #"--nopreview",
+    "--timeout", "0",
     "-o", "-"
 ], stdout=subprocess.PIPE, bufsize=0)
 
 # Socket setup
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.connect(("PC_IP_ADDRESS", 5000))
+sock.connect((PC_IP_ADDRESS, 5000))
 
 def capture_loop():
     while True:
@@ -63,4 +66,3 @@ threading.Thread(target=sender_loop, daemon=True).start()
 # Keep alive
 while True:
     time.sleep(1)
-

@@ -13,7 +13,7 @@ This system automates termite behavior tracking in real time using a Raspberry P
 
 ## 🖼️ System Overview
 
-![System Diagram](docs/system_architecture.png)
+![System Diagram](system_architecture.png)
 
 1. Raspberry Pi captures and streams MJPEG video
 2. PC receives and buffers video, runs inference

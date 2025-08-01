@@ -83,6 +83,7 @@ class ReceiverGUI(QWidget):
         self.video_fps = 1
         self.frame_idx = 0
         self.latest_frame = None
+        self.video_ref = None  # Initialize here, but don’t load video yet
 
         self.setWindowTitle("SLEAP Receiver")
         self.resize(800, 600)
@@ -99,6 +100,7 @@ class ReceiverGUI(QWidget):
         self.running = True
         self.frame_idx = 0
         self.net_labels = Labels()
+        self.video_ref = None  # Reset video_ref on start
 
         centroid_dir = self.centroidPath.text().strip()
         pose_dir = self.posePath.text().strip()
@@ -110,7 +112,6 @@ class ReceiverGUI(QWidget):
         self.predictor = load_model([centroid_dir, pose_dir], batch_size=1)
         print("Models loaded.")
 
-        # Copy skeleton.json
         skeleton_src = os.path.join(centroid_dir, "skeleton.json")
         skeleton_dst = os.path.join(self.inferPath.text().strip(), "skeleton.json")
         if os.path.exists(skeleton_src):
@@ -120,16 +121,15 @@ class ReceiverGUI(QWidget):
         else:
             print("Warning: skeleton.json not found in model directory.")
 
-        # Setup video writer
         vid_dir = self.videoPath.text().strip()
         if vid_dir:
             os.makedirs(vid_dir, exist_ok=True)
             self.writer_path = os.path.join(vid_dir, "output.mp4")
             print(f"Saving video to: {self.writer_path}")
+            # DO NOT load Video here because file does not exist yet
         else:
             self.writer_path = None
 
-        # Setup JSON path
         inf_dir = self.inferPath.text().strip()
         if inf_dir:
             os.makedirs(inf_dir, exist_ok=True)
@@ -138,7 +138,6 @@ class ReceiverGUI(QWidget):
         else:
             self.json_path = None
 
-        # Start server thread
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind(("0.0.0.0", 5000))
@@ -151,7 +150,6 @@ class ReceiverGUI(QWidget):
         self.running = False
         self.timer.stop()
 
-        # Close all client connections
         with self.clients_lock:
             for th in self.client_threads:
                 try:
@@ -161,7 +159,6 @@ class ReceiverGUI(QWidget):
                     pass
             self.client_threads.clear()
 
-        # Close server socket
         if self.sock:
             try:
                 self.sock.shutdown(socket.SHUT_RDWR)
@@ -170,13 +167,11 @@ class ReceiverGUI(QWidget):
             self.sock.close()
             self.sock = None
 
-        # Release writer
         if self.writer:
             self.writer.release()
             print(f"Video saved to {self.writer_path}")
             self.writer = None
 
-        # Save labels (.slp)
         out_dir = self.inferPath.text().strip()
         slp_out = os.path.join(out_dir, "network_inference.slp")
         try:
@@ -185,7 +180,6 @@ class ReceiverGUI(QWidget):
         except ModuleNotFoundError as e:
             print("Error saving .slp: {}\nPlease install ndx-pose.".format(e))
 
-        # Save trajectories
         try:
             df = self.net_labels.to_dataframe()
             traj_out = os.path.join(out_dir, "trajectories.h5")
@@ -194,7 +188,6 @@ class ReceiverGUI(QWidget):
         except Exception:
             print("Warning: could not export trajectories.")
 
-        # Save JSON dump
         if getattr(self, 'json_path', None):
             with open(self.json_path, 'w') as f:
                 json.dump(self.net_labels.to_dict(), f, indent=2)
@@ -218,23 +211,41 @@ class ReceiverGUI(QWidget):
     def _process_batch(self, frames, indices):
         if not frames:
             return
-        batch_vid = Video.from_numpy(np.array(frames))
-        lfs = self.predictor.predict(batch_vid)
+
+        if not self.writer_path:
+            print("No video file path set. Skipping batch.")
+            return
+
+        # Lazily create video_ref from saved file once available
+        if self.video_ref is None and os.path.exists(self.writer_path):
+            self.video_ref = Video.from_filename(self.writer_path)
+
+        if self.video_ref is None:
+            print("Warning: Video reference not available, skipping batch.")
+            return
+
+        # Run inference
+        lfs = self.predictor.predict(np.array(frames))
+
         for i, lf_data in enumerate(lfs):
             frame_i = indices[i]
-            img = frames[i].copy()
-            lf = LabeledFrame(video=batch_vid, frame_idx=frame_i)
+            lf = LabeledFrame(video=self.video_ref, frame_idx=frame_i)
             lf.instances = lf_data.instances
             self.net_labels.append(lf)
-            for inst in lf_data.instances:
-                for pt in inst.points:
-                    if math.isfinite(pt.x) and math.isfinite(pt.y):
-                        cv2.circle(img, (int(pt.x), int(pt.y)), 3, (0,255,0), -1)
+
+            # Write raw frames to disk (if writer active)
             if self.writer:
-                self.writer.write(img)
-            if i == len(frames)-1:
+                self.writer.write(frames[i])
+
+            # For preview only, draw annotations on a copy
+            if i == len(frames) - 1:
+                img_preview = frames[i].copy()
+                for inst in lf_data.instances:
+                    for pt in inst.points:
+                        if math.isfinite(pt.x) and math.isfinite(pt.y):
+                            cv2.circle(img_preview, (int(pt.x), int(pt.y)), 3, (0, 255, 0), -1)
                 with self.lock:
-                    self.latest_frame = img
+                    self.latest_frame = img_preview
 
     def handle_client(self, conn):
         buf = b""

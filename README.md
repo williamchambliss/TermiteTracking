@@ -27,7 +27,7 @@ This system automates termite behavior tracking in real time using a Raspberry P
 | Video Streaming     | `libcamera-vid`, TCP sockets      |
 | GUI & Frontend      | PyQt5                             |
 | Pose Estimation     | [SLEAP](https://sleap.ai)         |
-| Data Export         | JSON, MP4                         |
+| Data Export         | JSON, MP4, slp                    |
 
 ## 🛠️ Setup Instructions
 

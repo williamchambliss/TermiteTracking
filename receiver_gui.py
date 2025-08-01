@@ -8,7 +8,7 @@ import math
 import time
 import sleap
 from sleap.nn.inference import load_model
-from sleap import Video
+from sleap import Video, Labels, LabeledFrame
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QPushButton,
     QLineEdit, QFileDialog, QVBoxLayout, QHBoxLayout
@@ -17,12 +17,11 @@ from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QImage, QPixmap
 import json
 import os
+import shutil
 
-
-# Adjustable batch size at the top
+# Adjustable batch size and timeout
 BATCH_SIZE = 32
-BATCH_TIMEOUT = 0.5  # seconds to wait for filling batch before flushing
-
+BATCH_TIMEOUT = 0.5  # seconds to wait before flushing partial batch
 
 class ReceiverGUI(QWidget):
     def __init__(self):
@@ -31,17 +30,17 @@ class ReceiverGUI(QWidget):
         self.lock = threading.Lock()
 
         # UI Elements
-        self.centroidPath  = QLineEdit()
-        self.posePath      = QLineEdit()
-        self.inferPath     = QLineEdit()
-        self.videoPath     = QLineEdit()
+        self.centroidPath = QLineEdit()
+        self.posePath = QLineEdit()
+        self.inferPath = QLineEdit()
+        self.videoPath = QLineEdit()
         self.btnBrowseCentroid = QPushButton("Browse…")
-        self.btnBrowsePose     = QPushButton("Browse…")
-        self.btnBrowseInfer    = QPushButton("Browse…")
-        self.btnBrowseVideo    = QPushButton("Browse…")
-        self.btnRun       = QPushButton("Run")
-        self.btnStop      = QPushButton("Stop")
-        self.preview      = QLabel(alignment=Qt.AlignCenter)
+        self.btnBrowsePose = QPushButton("Browse…")
+        self.btnBrowseInfer = QPushButton("Browse…")
+        self.btnBrowseVideo = QPushButton("Browse…")
+        self.btnRun = QPushButton("Run")
+        self.btnStop = QPushButton("Stop")
+        self.preview = QLabel(alignment=Qt.AlignCenter)
 
         def makeRow(label, line, btn):
             h = QHBoxLayout()
@@ -52,14 +51,15 @@ class ReceiverGUI(QWidget):
 
         layout = QVBoxLayout()
         layout.addLayout(makeRow("Centroid model:", self.centroidPath, self.btnBrowseCentroid))
-        layout.addLayout(makeRow("Pose model:",     self.posePath,     self.btnBrowsePose))
-        layout.addLayout(makeRow("Infer out:",      self.inferPath,    self.btnBrowseInfer))
-        layout.addLayout(makeRow("Video save:",     self.videoPath,    self.btnBrowseVideo))
+        layout.addLayout(makeRow("Pose model:", self.posePath, self.btnBrowsePose))
+        layout.addLayout(makeRow("Infer out:", self.inferPath, self.btnBrowseInfer))
+        layout.addLayout(makeRow("Video save:", self.videoPath, self.btnBrowseVideo))
         layout.addWidget(self.preview)
         layout.addWidget(self.btnRun)
         layout.addWidget(self.btnStop)
         self.setLayout(layout)
 
+        # Connect buttons
         self.btnBrowseCentroid.clicked.connect(lambda: self._browse(self.centroidPath))
         self.btnBrowsePose.clicked.connect(lambda: self._browse(self.posePath))
         self.btnBrowseInfer.clicked.connect(lambda: self._browse(self.inferPath))
@@ -67,24 +67,21 @@ class ReceiverGUI(QWidget):
         self.btnRun.clicked.connect(self.start_receiving)
         self.btnStop.clicked.connect(self.stop_receiving)
 
-        # Network & threading
+        # Networking
         self.sock = None
         self.running = False
-        self.accept_thread = None
         self.client_threads = []
         self.clients_lock = threading.Lock()
 
-        # SLEAP and video
+        # SLEAP & output
         self.predictor = None
+        self.net_labels = Labels()
         self.timer = QTimer()
         self.timer.timeout.connect(self._update_preview)
         self.writer = None
         self.writer_path = None
-        self.video_fps = 1   #Change this to match the stream on the pi
-        self.json_buffer = []
+        self.video_fps = 1
         self.frame_idx = 0
-
-        # Latest frame for preview
         self.latest_frame = None
 
         self.setWindowTitle("SLEAP Receiver")
@@ -99,8 +96,9 @@ class ReceiverGUI(QWidget):
         if self.running:
             print("Already running")
             return
+        self.running = True
         self.frame_idx = 0
-        self.json_buffer = []
+        self.net_labels = Labels()
 
         centroid_dir = self.centroidPath.text().strip()
         pose_dir = self.posePath.text().strip()
@@ -112,6 +110,17 @@ class ReceiverGUI(QWidget):
         self.predictor = load_model([centroid_dir, pose_dir], batch_size=1)
         print("Models loaded.")
 
+        # Copy skeleton.json
+        skeleton_src = os.path.join(centroid_dir, "skeleton.json")
+        skeleton_dst = os.path.join(self.inferPath.text().strip(), "skeleton.json")
+        if os.path.exists(skeleton_src):
+            os.makedirs(os.path.dirname(skeleton_dst), exist_ok=True)
+            shutil.copy(skeleton_src, skeleton_dst)
+            print(f"Skeleton copied to {skeleton_dst}")
+        else:
+            print("Warning: skeleton.json not found in model directory.")
+
+        # Setup video writer
         vid_dir = self.videoPath.text().strip()
         if vid_dir:
             os.makedirs(vid_dir, exist_ok=True)
@@ -120,17 +129,21 @@ class ReceiverGUI(QWidget):
         else:
             self.writer_path = None
 
+        # Setup JSON path
         inf_dir = self.inferPath.text().strip()
         if inf_dir:
             os.makedirs(inf_dir, exist_ok=True)
             self.json_path = os.path.join(inf_dir, "inference.json")
-            print(f"Writing inference to: {self.json_path}")
+            print(f"Writing inference JSON to: {self.json_path}")
         else:
             self.json_path = None
 
-        self.running = True
-        self.accept_thread = threading.Thread(target=self.accept_clients, daemon=True)
-        self.accept_thread.start()
+        # Start server thread
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.sock.bind(("0.0.0.0", 5000))
+        self.sock.listen(1)
+        threading.Thread(target=self.accept_clients, daemon=True).start()
         self.timer.start(30)
 
     def stop_receiving(self):
@@ -140,202 +153,137 @@ class ReceiverGUI(QWidget):
 
         # Close all client connections
         with self.clients_lock:
-            for client in self.client_threads:
-                if hasattr(client, 'conn'):
-                    try:
-                        client.conn.shutdown(socket.SHUT_RDWR)
-                        client.conn.close()
-                    except Exception:
-                        pass
+            for th in self.client_threads:
+                try:
+                    th.conn.shutdown(socket.SHUT_RDWR)
+                    th.conn.close()
+                except:
+                    pass
             self.client_threads.clear()
 
         # Close server socket
         if self.sock:
             try:
                 self.sock.shutdown(socket.SHUT_RDWR)
-            except Exception:
+            except:
                 pass
             self.sock.close()
             self.sock = None
 
+        # Release writer
         if self.writer:
             self.writer.release()
             print(f"Video saved to {self.writer_path}")
             self.writer = None
 
-        if self.json_path:
+        # Save labels (.slp)
+        out_dir = self.inferPath.text().strip()
+        slp_out = os.path.join(out_dir, "network_inference.slp")
+        try:
+            self.net_labels.save(slp_out)
+            print(f"Labels saved to {slp_out}")
+        except ModuleNotFoundError as e:
+            print("Error saving .slp: {}\nPlease install ndx-pose.".format(e))
+
+        # Save trajectories
+        try:
+            df = self.net_labels.to_dataframe()
+            traj_out = os.path.join(out_dir, "trajectories.h5")
+            df.to_hdf(traj_out, key="trajectories", mode="w")
+            print(f"Trajectories saved to {traj_out}")
+        except Exception:
+            print("Warning: could not export trajectories.")
+
+        # Save JSON dump
+        if getattr(self, 'json_path', None):
             with open(self.json_path, 'w') as f:
-                json.dump(self.json_buffer, f, indent=2)
+                json.dump(self.net_labels.to_dict(), f, indent=2)
             print(f"Inference JSON saved to {self.json_path}")
 
         print("Stopped receiving.")
 
     def accept_clients(self):
-        try:
-            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.sock.bind(("0.0.0.0", 5000))
-            self.sock.listen(5)
-            print("Server listening on port 5000")
+        while self.running:
+            try:
+                conn, addr = self.sock.accept()
+            except:
+                break
+            print(f"Connected by {addr}")
+            th = threading.Thread(target=self.handle_client, args=(conn,), daemon=True)
+            th.conn = conn
+            with self.clients_lock:
+                self.client_threads.append(th)
+            th.start()
 
-            while self.running:
-                try:
-                    self.sock.settimeout(1.0)  # To periodically check self.running
-                    conn, addr = self.sock.accept()
-                except socket.timeout:
-                    continue
-                print(f"Connected by {addr}")
-
-                client_thread = threading.Thread(target=self.handle_client, args=(conn,), daemon=True)
-                client_thread.conn = conn  # Attach conn for later cleanup
-                with self.clients_lock:
-                    self.client_threads.append(client_thread)
-                client_thread.start()
-        except Exception as e:
-            print("Error in accept_clients:", e)
-
-    def _process_batch(self, frame_batch, frame_indices):
-        """Run inference on a batch and handle results in order."""
-        if not frame_batch:
+    def _process_batch(self, frames, indices):
+        if not frames:
             return
-
-        print(f"Running inference on batch of size {len(frame_batch)}. Queue size before processing: {len(frame_batch)}")
-
-        batch_vid = Video.from_numpy(np.array(frame_batch))
-        lfs_batch = self.predictor.predict(batch_vid)
-
-        for b_idx, lfs in enumerate(lfs_batch):
-            curr_frame = frame_batch[b_idx].copy()
-            instances = lfs.instances
-
-            for inst_idx, inst in enumerate(instances):
-                pts = inst.points
-                scrs = inst.scores
-
-                if isinstance(pts, tuple) and len(pts) == 2 and not isinstance(pts[0], (float, int)):
-                    x_coords = np.asarray(pts[0], dtype=float)
-                    y_coords = np.asarray(pts[1], dtype=float)
-                else:
-                    try:
-                        arr = np.asarray(pts, dtype=float).ravel()
-                    except Exception:
-                        print(f"Skipping non-numeric inst.points: {type(pts)}")
-                        continue
-                    if arr.ndim == 2 and arr.shape[1] == 2:
-                        x_coords = arr[:, 0]
-                        y_coords = arr[:, 1]
-                    elif arr.ndim == 1 and arr.size % 2 == 0:
-                        pairs = arr.reshape(-1, 2)
-                        x_coords = pairs[:, 0]
-                        y_coords = pairs[:, 1]
-                    else:
-                        print(f"Skipping unsupported inst.points length {arr.size}")
-                        continue
-
-                num_kp = len(x_coords)
-                for kp_idx in range(num_kp):
-                    x = x_coords[kp_idx]
-                    y = y_coords[kp_idx]
-                    score = scrs[kp_idx] if len(scrs) > kp_idx else 0.0
-
-                    if not (math.isfinite(x) and math.isfinite(y)):
-                        continue
-
-                    ix, iy = int(x), int(y)
-                    cv2.circle(curr_frame, (ix, iy), 3, (0, 255, 0), -1)
-                    self.json_buffer.append({
-                        'frame':    frame_indices[b_idx],
-                        'instance': inst_idx,
-                        'keypoint': kp_idx,
-                        'x':        float(x),
-                        'y':        float(y),
-                        'score':    float(score),
-                    })
-
+        batch_vid = Video.from_numpy(np.array(frames))
+        lfs = self.predictor.predict(batch_vid)
+        for i, lf_data in enumerate(lfs):
+            frame_i = indices[i]
+            img = frames[i].copy()
+            lf = LabeledFrame(video=batch_vid, frame_idx=frame_i)
+            lf.instances = lf_data.instances
+            self.net_labels.append(lf)
+            for inst in lf_data.instances:
+                for pt in inst.points:
+                    if math.isfinite(pt.x) and math.isfinite(pt.y):
+                        cv2.circle(img, (int(pt.x), int(pt.y)), 3, (0,255,0), -1)
             if self.writer:
-                self.writer.write(curr_frame)
-
-            # Update preview only for last frame in batch to avoid excessive updates
-            if b_idx == len(frame_batch) - 1:
+                self.writer.write(img)
+            if i == len(frames)-1:
                 with self.lock:
-                    self.latest_frame = curr_frame.copy()
+                    self.latest_frame = img
 
     def handle_client(self, conn):
         buf = b""
-        first_frame = True
-        frame_batch = []
-        frame_indices = []
-        last_frame_time = time.time()
-
-        try:
-            while self.running:
-                # Read 4-byte frame size
-                while len(buf) < 4:
-                    data = conn.recv(1024)
-                    if not data:
-                        print("Client disconnected")
-                        # Flush remaining batch before return
-                        self._process_batch(frame_batch, frame_indices)
-                        return
-                    buf += data
-                frame_size = struct.unpack(">I", buf[:4])[0]
-                buf = buf[4:]
-
-                # Read full frame bytes
-                while len(buf) < frame_size:
-                    data = conn.recv(frame_size - len(buf))
-                    if not data:
-                        print("Client disconnected during frame data")
-                        # Flush remaining batch before return
-                        self._process_batch(frame_batch, frame_indices)
-                        return
-                    buf += data
-                frame_bytes, buf = buf[:frame_size], buf[frame_size:]
-
-                frame = cv2.imdecode(np.frombuffer(frame_bytes, np.uint8), cv2.IMREAD_COLOR)
-                if frame is None:
-                    print("Failed to decode frame")
-                    continue
-
-                if first_frame and self.writer_path:
-                    h, w = frame.shape[:2]
-                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                    self.writer = cv2.VideoWriter(self.writer_path, fourcc, self.video_fps, (w, h))
-                    if not self.writer.isOpened():
-                        print("ERROR: VideoWriter failed to open.")
-                        self.writer = None
-                    else:
-                        print("VideoWriter opened.")
-                    first_frame = False
-
-                frame_batch.append(frame)
-                frame_indices.append(self.frame_idx)
-                self.frame_idx += 1
-                last_frame_time = time.time()
-
-                # If batch full, process it
-                if len(frame_batch) == BATCH_SIZE:
-                    self._process_batch(frame_batch, frame_indices)
-                    frame_batch.clear()
-                    frame_indices.clear()
-
-                # Check for timeout to flush partial batch
-                elif frame_batch and (time.time() - last_frame_time) > BATCH_TIMEOUT:
-                    self._process_batch(frame_batch, frame_indices)
-                    frame_batch.clear()
-                    frame_indices.clear()
-
-        except Exception as e:
-            print("Error handling client:", e)
-            # Flush any remaining frames on error
-            self._process_batch(frame_batch, frame_indices)
-        finally:
+        first = True
+        frames, indices = [], []
+        last = time.time()
+        while self.running:
             try:
-                conn.shutdown(socket.SHUT_RDWR)
-                conn.close()
-            except Exception:
-                pass
-            print("Client connection closed")
+                while len(buf) < 4:
+                    data = conn.recv(4096)
+                    if not data:
+                        raise ConnectionResetError
+                    buf += data
+                size = struct.unpack(">I", buf[:4])[0]
+                buf = buf[4:]
+                while len(buf) < size:
+                    data = conn.recv(size-len(buf))
+                    if not data:
+                        raise ConnectionResetError
+                    buf += data
+                chunk, buf = buf[:size], buf[size:]
+                frame = cv2.imdecode(np.frombuffer(chunk, np.uint8), cv2.IMREAD_COLOR)
+                if frame is None:
+                    continue
+                if first and self.writer_path:
+                    h,w = frame.shape[:2]
+                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                    self.writer = cv2.VideoWriter(self.writer_path, fourcc, self.video_fps, (w,h))
+                    first = False
+                frames.append(frame)
+                indices.append(self.frame_idx)
+                self.frame_idx += 1
+                last = time.time()
+                if len(frames) >= BATCH_SIZE or (frames and time.time()-last > BATCH_TIMEOUT):
+                    self._process_batch(frames, indices)
+                    frames.clear(); indices.clear()
+            except ConnectionResetError:
+                break
+            except Exception as e:
+                print("Error in client loop:", e)
+                break
+        if frames:
+            self._process_batch(frames, indices)
+        try:
+            conn.shutdown(socket.SHUT_RDWR)
+            conn.close()
+        except:
+            pass
+        print("Client closed")
 
     def _update_preview(self):
         with self.lock:
@@ -343,15 +291,12 @@ class ReceiverGUI(QWidget):
                 return
             frame = self.latest_frame.copy()
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        h, w = frame.shape[:2]
-        img = QImage(rgb.data, w, h, 3*w, QImage.Format_RGB888)
-        pix = QPixmap.fromImage(img).scaled(
-            self.preview.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
-        )
+        h,w = frame.shape[:2]
+        qimg = QImage(rgb.data, w, h, 3*w, QImage.Format_RGB888)
+        pix = QPixmap.fromImage(qimg).scaled(self.preview.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.preview.setPixmap(pix)
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app = QApplication(sys.argv)
     gui = ReceiverGUI()
     gui.show()

@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+
+import socket
+import struct
+import subprocess
+import threading
+import queue
+import time
+import os
+
+# Server (PC) IP & Port
+PC_IP_ADDRESS = "192.168.4.71"  # <-- Replace with your PC's IP
+PORT = 5000
+
+# Queue for frame buffering
+frame_queue = queue.Queue(maxsize=50)
+
+def start_libcamera():
+    return subprocess.Popen([
+        "libcamera-vid",
+        "--width", "1000",
+        "--height", "1000",
+        "--framerate", "1",  # Adjust depending on performance
+        "--codec", "mjpeg",
+        "--timeout", "0",
+        "-o", "-"
+    ], stdout=subprocess.PIPE, bufsize=0)
+
+def connect_socket():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect((PC_IP_ADDRESS, PORT))
+    return sock
+
+def capture_loop(proc):
+    while True:
+        start = proc.stdout.read(2)
+        if not start:
+            break
+        if start != b'\xff\xd8':
+            continue
+        jpeg_data = start
+        while True:
+            byte = proc.stdout.read(1)
+            if not byte:
+                break
+            jpeg_data += byte
+            if jpeg_data[-2:] == b'\xff\xd9':
+                break
+        try:
+            frame_queue.put_nowait(jpeg_data)
+        except queue.Full:
+            print("Dropped frame: queue full")
+
+def sender_loop(sock):
+    while True:
+        jpeg_data = frame_queue.get()
+        try:
+            sock.sendall(struct.pack(">I", len(jpeg_data)))
+            sock.sendall(jpeg_data)
+        except (BrokenPipeError, ConnectionResetError):
+            print("Connection lost. Exiting sender loop.")
+            break
+
+def main():
+    try:
+        proc = start_libcamera()
+        sock = connect_socket()
+
+        threading.Thread(target=capture_loop, args=(proc,), daemon=True).start()
+        threading.Thread(target=sender_loop, args=(sock,), daemon=True).start()
+
+        while True:
+            time.sleep(1)
+    except Exception as e:
+        print("Error:", e)
+    finally:
+        if proc:
+            proc.terminate()
+        if sock:
+            sock.close()
+
+if __name__ == "__main__":
+    main()

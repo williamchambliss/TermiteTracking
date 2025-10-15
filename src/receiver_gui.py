@@ -219,13 +219,13 @@ class ReceiverGUI(QWidget):
         last = time.time()
         while self.running:
             try:
-                while len(buf) < 4:
+                while len(buf) < 12:
                     data = conn.recv(4096)
                     if not data:
                         raise ConnectionResetError
                     buf += data
-                size = struct.unpack(">I", buf[:4])[0]
-                buf = buf[4:]
+                timestamp, size = struct.unpack(">dI", buf[:12])
+                buf = buf[12:]
                 while len(buf) < size:
                     data = conn.recv(size-len(buf))
                     if not data:
@@ -240,7 +240,7 @@ class ReceiverGUI(QWidget):
                     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
                     self.writer = cv2.VideoWriter(self.writer_path, fourcc, self.video_fps, (w, h))
                     first = False
-                frames.append(frame)
+                frames.append((frame, timestamp))
                 indices.append(self.frame_idx)
                 self.frame_idx += 1
                 last = time.time()
@@ -266,7 +266,9 @@ class ReceiverGUI(QWidget):
         if not frames:
             return
 
-        lfs = self.predictor.predict(np.array(frames))
+        frames_only = [f for f, _ in frames]
+        timestamps = [t for _, t in frames]
+        lfs = self.predictor.predict(np.array(frames_only))
 
         for i, lf_data in enumerate(lfs):
             frame_i = indices[i]
@@ -277,7 +279,11 @@ class ReceiverGUI(QWidget):
                 self.net_labels.append(lf)
             except Exception as e:
                 print(f"Error appending LabeledFrame: {e}")
-
+            if len(timestamps) > 1:
+                avg_dt = np.mean(np.diff(timestamps))
+                fps_est = 1.0 / avg_dt if avg_dt > 0 else self.video_fps
+                if abs(fps_est - self.video_fps) > 0.5:
+                    self.video_fps = fps_est
             if self.writer:
                 self.writer.write(frames[i])
 
@@ -332,3 +338,4 @@ if __name__ == "__main__":
     gui = ReceiverGUI()
     gui.show()
     sys.exit(app.exec_())
+

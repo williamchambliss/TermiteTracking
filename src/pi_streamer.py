@@ -52,8 +52,9 @@ def capture_loop():
 def sender_loop():
     while True:
         jpeg_data = frame_queue.get()
+        timestamp = time.time()
         try:
-            sock.sendall(struct.pack(">I", len(jpeg_data)))
+            sock.sendall(struct.pack(">I", timestamp, len(jpeg_data)))
             sock.sendall(jpeg_data)
         except BrokenPipeError:
             break
@@ -65,3 +66,4 @@ threading.Thread(target=sender_loop, daemon=True).start()
 # Keep alive
 while True:
     time.sleep(1)
+

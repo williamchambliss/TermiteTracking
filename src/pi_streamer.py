@@ -29,25 +29,40 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect((PC_IP_ADDRESS, 5000))
 
 def capture_loop():
+    buf = b""
     while True:
-        # Read JPEG frame length (2-byte MJPEG marker + JPEG header)
-        start = proc.stdout.read(2)
-        if not start:
+        # Read in chunks for efficiency (not one byte at a time)
+        data = proc.stdout.read(4096)
+        if not data:
             break
-        if start != b'\xff\xd8':
-            continue
-        jpeg_data = start
+        buf += data
+
         while True:
-            byte = proc.stdout.read(1)
-            if not byte:
+            # Find the start of a JPEG frame
+            start = buf.find(b'\xff\xd8')
+            if start == -1:
+                # No start marker yet; wait for more data
+                buf = b""
                 break
-            jpeg_data += byte
-            if jpeg_data[-2:] == b'\xff\xd9':
+
+            # Find the end of this JPEG frame
+            end = buf.find(b'\xff\xd9', start)
+            if end == -1:
+                # Incomplete frame; wait for more data
+                buf = buf[start:]
                 break
-        try:
-            frame_queue.put_nowait(jpeg_data)
-        except queue.Full:
-            print("Dropped frame: queue full")
+
+            # Extract full JPEG frame
+            jpeg_data = buf[start:end+2]
+
+            # Remove it from buffer for next iteration
+            buf = buf[end+2:]
+
+            # Push to queue without blocking
+            try:
+                frame_queue.put_nowait(jpeg_data)
+            except queue.Full:
+                print("Dropped frame: queue full")
 
 def sender_loop():
     while True:
@@ -66,4 +81,5 @@ threading.Thread(target=sender_loop, daemon=True).start()
 # Keep alive
 while True:
     time.sleep(1)
+
 

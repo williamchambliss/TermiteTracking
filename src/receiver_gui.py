@@ -8,7 +8,7 @@ import math
 import time
 import sleap
 from sleap.nn.inference import load_model
-from sleap import Video, Labels, LabeledFrame
+from sleap import Labels, LabeledFrame, Video
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QPushButton,
     QLineEdit, QFileDialog, QVBoxLayout, QHBoxLayout
@@ -18,10 +18,13 @@ from PyQt5.QtGui import QImage, QPixmap
 import json
 import os
 import shutil
+import tensorflow as tf
+import gc  # 🧹 Added for memory cleanup
 
-# Adjustable batch size and timeout
 BATCH_SIZE = 32
-BATCH_TIMEOUT = 0.5  # seconds to wait before flushing partial batch
+BATCH_TIMEOUT = 0.5  # seconds
+MODEL_RELOAD_INTERVAL = 100  # reload every 100 chunks
+
 
 class ReceiverGUI(QWidget):
     def __init__(self):
@@ -80,10 +83,13 @@ class ReceiverGUI(QWidget):
         self.timer.timeout.connect(self._update_preview)
         self.writer = None
         self.writer_path = None
-        self.video_fps = 1
+        self.video_fps = 10
         self.frame_idx = 0
         self.latest_frame = None
-        self.video_ref = None  # Initialize here, but don’t load video yet
+        self.video_ref = None
+        self.chunk_counter = 0
+        self.batch_since_save = 0
+        self.chunk_dir = None
 
         self.setWindowTitle("SLEAP Receiver")
         self.resize(800, 600)
@@ -100,19 +106,19 @@ class ReceiverGUI(QWidget):
         self.running = True
         self.frame_idx = 0
         self.net_labels = Labels()
-        self.video_ref = None  # Reset video_ref on start
+        self.video_ref = Video(backend="opencv")  # dummy Video object for LabeledFrame
 
-        centroid_dir = self.centroidPath.text().strip()
-        pose_dir = self.posePath.text().strip()
-        if not centroid_dir or not pose_dir:
+        self.centroid_dir = self.centroidPath.text().strip()
+        self.pose_dir = self.posePath.text().strip()
+        if not self.centroid_dir or not self.pose_dir:
             print("Please specify both centroid and pose model directories.")
             return
 
         print("Loading models...")
-        self.predictor = load_model([centroid_dir, pose_dir], batch_size=1)
+        self.predictor = load_model([self.centroid_dir, self.pose_dir], batch_size=1)
         print("Models loaded.")
 
-        skeleton_src = os.path.join(centroid_dir, "skeleton.json")
+        skeleton_src = os.path.join(self.centroid_dir, "skeleton.json")
         skeleton_dst = os.path.join(self.inferPath.text().strip(), "skeleton.json")
         if os.path.exists(skeleton_src):
             os.makedirs(os.path.dirname(skeleton_dst), exist_ok=True)
@@ -126,7 +132,6 @@ class ReceiverGUI(QWidget):
             os.makedirs(vid_dir, exist_ok=True)
             self.writer_path = os.path.join(vid_dir, "output.mp4")
             print(f"Saving video to: {self.writer_path}")
-            # DO NOT load Video here because file does not exist yet
         else:
             self.writer_path = None
 
@@ -134,10 +139,13 @@ class ReceiverGUI(QWidget):
         if inf_dir:
             os.makedirs(inf_dir, exist_ok=True)
             self.json_path = os.path.join(inf_dir, "inference.json")
+            self.chunk_dir = os.path.join(inf_dir, "chunks")
+            os.makedirs(self.chunk_dir, exist_ok=True)
             print(f"Writing inference JSON to: {self.json_path}")
         else:
             self.json_path = None
 
+        # Start network listener
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind(("0.0.0.0", 5000))
@@ -172,26 +180,22 @@ class ReceiverGUI(QWidget):
             print(f"Video saved to {self.writer_path}")
             self.writer = None
 
-        out_dir = self.inferPath.text().strip()
-        slp_out = os.path.join(out_dir, "network_inference.slp")
-        try:
-            self.net_labels.save(slp_out)
-            print(f"Labels saved to {slp_out}")
-        except ModuleNotFoundError as e:
-            print("Error saving .slp: {}\nPlease install ndx-pose.".format(e))
-
-        try:
-            df = self.net_labels.to_dataframe()
-            traj_out = os.path.join(out_dir, "trajectories.h5")
-            df.to_hdf(traj_out, key="trajectories", mode="w")
-            print(f"Trajectories saved to {traj_out}")
-        except Exception:
-            print("Warning: could not export trajectories.")
+        # Save remaining labels
+        if self.net_labels and len(self.net_labels) > 0:
+            chunk_file = os.path.join(self.chunk_dir, f"labels_chunk_{self.chunk_counter}.slp")
+            try:
+                self.net_labels.save(chunk_file)
+                print(f"Saved final .slp chunk: {chunk_file}")
+            except Exception as e:
+                print(f"Error saving final .slp chunk: {e}")
 
         if getattr(self, 'json_path', None):
-            with open(self.json_path, 'w') as f:
-                json.dump(self.net_labels.to_dict(), f, indent=2)
-            print(f"Inference JSON saved to {self.json_path}")
+            try:
+                with open(self.json_path, 'w') as f:
+                    json.dump(self.net_labels.to_dict(), f, indent=2)
+                print(f"Inference JSON saved to {self.json_path}")
+            except Exception as e:
+                print(f"Error saving inference JSON: {e}")
 
         print("Stopped receiving.")
 
@@ -207,45 +211,6 @@ class ReceiverGUI(QWidget):
             with self.clients_lock:
                 self.client_threads.append(th)
             th.start()
-
-    def _process_batch(self, frames, indices):
-        if not frames:
-            return
-
-        if not self.writer_path:
-            print("No video file path set. Skipping batch.")
-            return
-
-        # Lazily create video_ref from saved file once available
-        if self.video_ref is None and os.path.exists(self.writer_path):
-            self.video_ref = Video.from_filename(self.writer_path)
-
-        if self.video_ref is None:
-            print("Warning: Video reference not available, skipping batch.")
-            return
-
-        # Run inference
-        lfs = self.predictor.predict(np.array(frames))
-
-        for i, lf_data in enumerate(lfs):
-            frame_i = indices[i]
-            lf = LabeledFrame(video=self.video_ref, frame_idx=frame_i)
-            lf.instances = lf_data.instances
-            self.net_labels.append(lf)
-
-            # Write raw frames to disk (if writer active)
-            if self.writer:
-                self.writer.write(frames[i])
-
-            # For preview only, draw annotations on a copy
-            if i == len(frames) - 1:
-                img_preview = frames[i].copy()
-                for inst in lf_data.instances:
-                    for pt in inst.points:
-                        if math.isfinite(pt.x) and math.isfinite(pt.y):
-                            cv2.circle(img_preview, (int(pt.x), int(pt.y)), 3, (0, 255, 0), -1)
-                with self.lock:
-                    self.latest_frame = img_preview
 
     def handle_client(self, conn):
         buf = b""
@@ -271,17 +236,18 @@ class ReceiverGUI(QWidget):
                 if frame is None:
                     continue
                 if first and self.writer_path:
-                    h,w = frame.shape[:2]
+                    h, w = frame.shape[:2]
                     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                    self.writer = cv2.VideoWriter(self.writer_path, fourcc, self.video_fps, (w,h))
+                    self.writer = cv2.VideoWriter(self.writer_path, fourcc, self.video_fps, (w, h))
                     first = False
                 frames.append(frame)
                 indices.append(self.frame_idx)
                 self.frame_idx += 1
                 last = time.time()
-                if len(frames) >= BATCH_SIZE or (frames and time.time()-last > BATCH_TIMEOUT):
+                if len(frames) >= BATCH_SIZE or (frames and time.time() - last > BATCH_TIMEOUT):
                     self._process_batch(frames, indices)
-                    frames.clear(); indices.clear()
+                    frames.clear()
+                    indices.clear()
             except ConnectionResetError:
                 break
             except Exception as e:
@@ -296,16 +262,70 @@ class ReceiverGUI(QWidget):
             pass
         print("Client closed")
 
+    def _process_batch(self, frames, indices):
+        if not frames:
+            return
+
+        lfs = self.predictor.predict(np.array(frames))
+
+        for i, lf_data in enumerate(lfs):
+            frame_i = indices[i]
+            lf = LabeledFrame(video=self.video_ref, frame_idx=frame_i)
+            lf.instances = lf_data.instances
+
+            try:
+                self.net_labels.append(lf)
+            except Exception as e:
+                print(f"Error appending LabeledFrame: {e}")
+
+            if self.writer:
+                self.writer.write(frames[i])
+
+            if i == len(frames) - 1:
+                img_preview = frames[i].copy()
+                for inst in lf.instances:
+                    for pt in inst.points:
+                        if math.isfinite(pt.x) and math.isfinite(pt.y):
+                            cv2.circle(img_preview, (int(pt.x), int(pt.y)), 3, (0, 255, 0), -1)
+                with self.lock:
+                    self.latest_frame = img_preview
+
+        # Save .slp every 2 batches
+        self.batch_since_save += 1
+        if self.batch_since_save >= 2:
+            chunk_file = os.path.join(self.chunk_dir, f"labels_chunk_{self.chunk_counter}.slp")
+            try:
+                self.net_labels.save(chunk_file)
+                print(f"Saved .slp chunk: {chunk_file}")
+            except Exception as e:
+                print(f"Error saving .slp chunk: {e}")
+            self.net_labels = Labels()
+            self.chunk_counter += 1
+            self.batch_since_save = 0
+
+            # 🧠 Reload model every MODEL_RELOAD_INTERVAL chunks
+            if self.chunk_counter % MODEL_RELOAD_INTERVAL == 0:
+                print("Reloading SLEAP models to free memory...")
+                self.predictor = load_model([self.centroid_dir, self.pose_dir], batch_size=1)
+                print("Model reloaded successfully.")
+
+        # 🧹 Memory cleanup after every batch
+        tf.keras.backend.clear_session()
+        gc.collect()
+
     def _update_preview(self):
         with self.lock:
             if self.latest_frame is None:
                 return
             frame = self.latest_frame.copy()
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        h,w = frame.shape[:2]
+        h, w = frame.shape[:2]
         qimg = QImage(rgb.data, w, h, 3*w, QImage.Format_RGB888)
-        pix = QPixmap.fromImage(qimg).scaled(self.preview.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        pix = QPixmap.fromImage(qimg).scaled(
+            self.preview.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+        )
         self.preview.setPixmap(pix)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -285,10 +285,10 @@ class ReceiverGUI(QWidget):
                 if abs(fps_est - self.video_fps) > 0.5:
                     self.video_fps = fps_est
             if self.writer:
-                self.writer.write(frames[i])
+                self.writer.write(frames_only[i])
 
             if i == len(frames) - 1:
-                img_preview = frames[i].copy()
+                img_preview = frames_only[i].copy()
                 for inst in lf.instances:
                     for pt in inst.points:
                         if math.isfinite(pt.x) and math.isfinite(pt.y):
@@ -338,4 +338,5 @@ if __name__ == "__main__":
     gui = ReceiverGUI()
     gui.show()
     sys.exit(app.exec_())
+
 

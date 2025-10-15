@@ -6,9 +6,9 @@ import queue
 import time
 
 # Server (PC) IP & Port
-PC_IP_ADDRESS = "192.168.4.71"  # <-- your PC's IP
+PC_IP_ADDRESS = "169.254.221.104"  # <-- your PC's IP CHANGE WHEN CHANGED
 PORT = 5000
-
+#libcamera-hello -t 0 --width 1000 --height 1000 --roi 0.22,0.0,0.7,0.9 YESSSSS           gvb mv,klbv
 # Queue for frame buffering
 frame_queue = queue.Queue(maxsize=50)
 
@@ -17,10 +17,9 @@ proc = subprocess.Popen([
     "libcamera-vid",
     "--width", "1000",
     "--height", "1000",
-    "--framerate", "1",   # Change this frame rate depending on compute of machine (1 low, 5 high but actually usable)
+    "--framerate", "10",   # Change this frame rate depending on compute of machine (1 low, 5 high but actually usable)
     "--codec", "mjpeg",
-    #"--quality", "25",  
-    #"--nopreview",
+    "--roi", "0.22,0.0,0.7,0.9",
     "--timeout", "0",
     "-o", "-"
 ], stdout=subprocess.PIPE, bufsize=0)

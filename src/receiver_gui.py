@@ -23,7 +23,7 @@ import gc  # 🧹 Added for memory cleanup
 
 BATCH_SIZE = 32
 BATCH_TIMEOUT = 0.5  # seconds
-MODEL_RELOAD_INTERVAL = 100  # reload every 100 chunks
+MODEL_RELOAD_INTERVAL = 5  # reload every 1500 chunks
 
 
 class ReceiverGUI(QWidget):
@@ -44,6 +44,7 @@ class ReceiverGUI(QWidget):
         self.btnRun = QPushButton("Run")
         self.btnStop = QPushButton("Stop")
         self.preview = QLabel(alignment=Qt.AlignCenter)
+       
 
         def makeRow(label, line, btn):
             h = QHBoxLayout()
@@ -106,7 +107,17 @@ class ReceiverGUI(QWidget):
         self.running = True
         self.frame_idx = 0
         self.net_labels = Labels()
-        self.video_ref = Video(backend="opencv")  # dummy Video object for LabeledFrame
+
+        vid_dir = self.videoPath.text().strip()
+        if vid_dir:
+            os.makedirs(vid_dir, exist_ok=True)
+            self.writer_path = os.path.join(vid_dir, "output.mp4")
+            # Video object pointing to the MP4 that will be written
+            self.video_ref = Video.from_filename(self.writer_path)
+            print(f"LabeledFrames will reference video: {self.writer_path}")
+        else:
+            self.writer_path = None
+            self.video_ref = None
 
         self.centroid_dir = self.centroidPath.text().strip()
         self.pose_dir = self.posePath.text().strip()
@@ -296,9 +307,9 @@ class ReceiverGUI(QWidget):
                 with self.lock:
                     self.latest_frame = img_preview
 
-        # Save .slp every 2 batches
+        # Save .slp every 200 batches
         self.batch_since_save += 1
-        if self.batch_since_save >= 2:
+        if self.batch_since_save >= 300:
             chunk_file = os.path.join(self.chunk_dir, f"labels_chunk_{self.chunk_counter}.slp")
             try:
                 self.net_labels.save(chunk_file)
@@ -338,5 +349,4 @@ if __name__ == "__main__":
     gui = ReceiverGUI()
     gui.show()
     sys.exit(app.exec_())
-
 

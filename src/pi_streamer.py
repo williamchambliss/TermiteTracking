@@ -10,7 +10,7 @@ PC_IP_ADDRESS = "169.254.221.104"  # <-- your PC's IP CHANGE WHEN CHANGED
 PORT = 5000
 #libcamera-hello -t 0 --width 1000 --height 1000 --roi 0.22,0.0,0.7,0.9 YESSSSS           gvb mv,klbv
 # Queue for frame buffering
-frame_queue = queue.Queue(maxsize=50)
+frame_queue = queue.Queue(maxsize=100)
 
 # Launch libcamera-vid
 proc = subprocess.Popen([
@@ -81,6 +81,4 @@ threading.Thread(target=sender_loop, daemon=True).start()
 # Keep alive
 while True:
     time.sleep(1)
-
-
 

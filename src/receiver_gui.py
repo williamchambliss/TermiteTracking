@@ -21,9 +21,9 @@ import shutil
 import tensorflow as tf
 import gc  # 🧹 Added for memory cleanup
 
-BATCH_SIZE = 32
+BATCH_SIZE = 64
 BATCH_TIMEOUT = 0.5  # seconds
-MODEL_RELOAD_INTERVAL = 5  # reload every 1500 chunks
+MODEL_RELOAD_INTERVAL = 1  # reload every N saved chunks
 
 
 class ReceiverGUI(QWidget):
@@ -44,7 +44,12 @@ class ReceiverGUI(QWidget):
         self.btnRun = QPushButton("Run")
         self.btnStop = QPushButton("Stop")
         self.preview = QLabel(alignment=Qt.AlignCenter)
-       
+
+        # New: max termites setting
+        self.max_pred_label = QLabel("Max Termites:")
+        self.max_pred_input = QLineEdit("8")
+        self.max_pred_input.setFixedWidth(80)
+        self.max_pred_input.setToolTip("Max number of termite instances to keep per frame")
 
         def makeRow(label, line, btn):
             h = QHBoxLayout()
@@ -58,6 +63,14 @@ class ReceiverGUI(QWidget):
         layout.addLayout(makeRow("Pose model:", self.posePath, self.btnBrowsePose))
         layout.addLayout(makeRow("Infer out:", self.inferPath, self.btnBrowseInfer))
         layout.addLayout(makeRow("Video save:", self.videoPath, self.btnBrowseVideo))
+
+        # Add max-pred UI row
+        hmax = QHBoxLayout()
+        hmax.addWidget(self.max_pred_label)
+        hmax.addWidget(self.max_pred_input)
+        hmax.addStretch()
+        layout.addLayout(hmax)
+
         layout.addWidget(self.preview)
         layout.addWidget(self.btnRun)
         layout.addWidget(self.btnStop)
@@ -92,6 +105,9 @@ class ReceiverGUI(QWidget):
         self.batch_since_save = 0
         self.chunk_dir = None
 
+        # Max preds runtime value (set in start_receiving)
+        self.max_predictions = None
+
         self.setWindowTitle("SLEAP Receiver")
         self.resize(800, 600)
 
@@ -104,6 +120,17 @@ class ReceiverGUI(QWidget):
         if self.running:
             print("Already running")
             return
+
+        # Read max_predictions from GUI once at start
+        try:
+            self.max_predictions = int(self.max_pred_input.text())
+            if self.max_predictions < 1:
+                raise ValueError
+        except Exception:
+            print("Invalid Max Termites value; defaulting to 8")
+            self.max_predictions = 8
+            self.max_pred_input.setText("8")
+
         self.running = True
         self.frame_idx = 0
         self.net_labels = Labels()
@@ -123,6 +150,7 @@ class ReceiverGUI(QWidget):
         self.pose_dir = self.posePath.text().strip()
         if not self.centroid_dir or not self.pose_dir:
             print("Please specify both centroid and pose model directories.")
+            self.running = False
             return
 
         print("Loading models...")
@@ -192,7 +220,7 @@ class ReceiverGUI(QWidget):
             self.writer = None
 
         # Save remaining labels
-        if self.net_labels and len(self.net_labels) > 0:
+        if self.net_labels and len(self.net_labels) > 0 and getattr(self, "chunk_dir", None):
             chunk_file = os.path.join(self.chunk_dir, f"labels_chunk_{self.chunk_counter}.slp")
             try:
                 self.net_labels.save(chunk_file)
@@ -227,7 +255,7 @@ class ReceiverGUI(QWidget):
         buf = b""
         first = True
         frames, indices = [], []
-        last = time.time()
+        last_recv = time.time()
         while self.running:
             try:
                 while len(buf) < 12:
@@ -238,7 +266,7 @@ class ReceiverGUI(QWidget):
                 timestamp, size = struct.unpack(">dI", buf[:12])
                 buf = buf[12:]
                 while len(buf) < size:
-                    data = conn.recv(size-len(buf))
+                    data = conn.recv(size - len(buf))
                     if not data:
                         raise ConnectionResetError
                     buf += data
@@ -254,8 +282,8 @@ class ReceiverGUI(QWidget):
                 frames.append((frame, timestamp))
                 indices.append(self.frame_idx)
                 self.frame_idx += 1
-                last = time.time()
-                if len(frames) >= BATCH_SIZE or (frames and time.time() - last > BATCH_TIMEOUT):
+                last_recv = time.time()
+                if len(frames) >= BATCH_SIZE or (frames and time.time() - last_recv > BATCH_TIMEOUT):
                     self._process_batch(frames, indices)
                     frames.clear()
                     indices.clear()
@@ -279,25 +307,56 @@ class ReceiverGUI(QWidget):
 
         frames_only = [f for f, _ in frames]
         timestamps = [t for _, t in frames]
-        lfs = self.predictor.predict(np.array(frames_only))
+        try:
+            lfs = self.predictor.predict(np.array(frames_only))
+        except Exception as e:
+            print("Prediction error:", e)
+            return
 
         for i, lf_data in enumerate(lfs):
             frame_i = indices[i]
-            lf = LabeledFrame(video=self.video_ref, frame_idx=frame_i)
-            lf.instances = lf_data.instances
 
+            # Create labeled frame and attach instances from predictor
+            lf = LabeledFrame(video=self.video_ref, frame_idx=frame_i)
+            lf.instances = lf_data.instances  # copy predictor instances
+
+            # Filter instances by confidence then cap to max_predictions
+            if lf.instances:
+                # If instances have a direct score attribute, use it
+                if hasattr(lf.instances[0], "score") and lf.instances[0].score is not None:
+                    lf.instances.sort(key=lambda inst: getattr(inst, "score", 0.0), reverse=True)
+                else:
+                    # Fallback: compute mean point confidence if available
+                    def mean_conf(inst):
+                        scores = []
+                        for pt in getattr(inst, "points", []):
+                            if hasattr(pt, "score") and pt.score is not None:
+                                scores.append(pt.score)
+                        return float(np.nanmean(scores)) if scores else 0.0
+                    lf.instances.sort(key=mean_conf, reverse=True)
+
+                # Cap to configured max
+                if self.max_predictions is not None and len(lf.instances) > self.max_predictions:
+                    lf.instances = lf.instances[:self.max_predictions]
+
+            # Append to master labels
             try:
                 self.net_labels.append(lf)
             except Exception as e:
                 print(f"Error appending LabeledFrame: {e}")
+
+            # Update fps estimate
             if len(timestamps) > 1:
                 avg_dt = np.mean(np.diff(timestamps))
                 fps_est = 1.0 / avg_dt if avg_dt > 0 else self.video_fps
                 if abs(fps_est - self.video_fps) > 0.5:
                     self.video_fps = fps_est
+
+            # Write frame to video if enabled
             if self.writer:
                 self.writer.write(frames_only[i])
 
+            # Prepare preview (draw last frame of batch)
             if i == len(frames) - 1:
                 img_preview = frames_only[i].copy()
                 for inst in lf.instances:
@@ -307,27 +366,37 @@ class ReceiverGUI(QWidget):
                 with self.lock:
                     self.latest_frame = img_preview
 
-        # Save .slp every 200 batches
+        # Save .slp every N batch groups (configured by batch_since_save threshold)
         self.batch_since_save += 1
-        if self.batch_since_save >= 300:
-            chunk_file = os.path.join(self.chunk_dir, f"labels_chunk_{self.chunk_counter}.slp")
-            try:
-                self.net_labels.save(chunk_file)
-                print(f"Saved .slp chunk: {chunk_file}")
-            except Exception as e:
-                print(f"Error saving .slp chunk: {e}")
-            self.net_labels = Labels()
-            self.chunk_counter += 1
-            self.batch_since_save = 0
+        if self.batch_since_save >= 100:
+            if getattr(self, "chunk_dir", None) is not None:
+                chunk_file = os.path.join(self.chunk_dir, f"labels_chunk_{self.chunk_counter}.slp")
+                try:
+                    self.net_labels.save(chunk_file)
+                    print(f"Saved .slp chunk: {chunk_file}")
+                except Exception as e:
+                    print(f"Error saving .slp chunk: {e}")
+                # Reset labels but keep video_ref
+                self.net_labels = Labels()
+                self.chunk_counter += 1
+                self.batch_since_save = 0
 
-            # 🧠 Reload model every MODEL_RELOAD_INTERVAL chunks
-            if self.chunk_counter % MODEL_RELOAD_INTERVAL == 0:
-                print("Reloading SLEAP models to free memory...")
-                self.predictor = load_model([self.centroid_dir, self.pose_dir], batch_size=1)
-                print("Model reloaded successfully.")
+                # Reload model occasionally to free memory (infrequent)
+                if self.chunk_counter % MODEL_RELOAD_INTERVAL == 0:
+                    print("Reloading SLEAP models to free memory...")
+                    try:
+                        # clear session then reload
+                        tf.keras.backend.clear_session()
+                        gc.collect()
+                        self.predictor = load_model([self.centroid_dir, self.pose_dir], batch_size=1)
+                        print("Model reloaded successfully.")
+                    except Exception as e:
+                        print("Error reloading model:", e)
+            else:
+                # No chunk dir configured; just reset counters
+                self.batch_since_save = 0
 
-        # 🧹 Memory cleanup after every batch
-        tf.keras.backend.clear_session()
+        # Minor cleanup after batch
         gc.collect()
 
     def _update_preview(self):
@@ -349,4 +418,3 @@ if __name__ == "__main__":
     gui = ReceiverGUI()
     gui.show()
     sys.exit(app.exec_())
-
